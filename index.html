@@ -673,6 +673,7 @@
     wallHitPlatform: null,
     wallHitType: 3, 
     preHitVx: 0,  
+    isWallBouncing: false, // 【追加】壁から跳ね返り中の制御不能フラグ
     
     confusionEndTime: 0,
     hitStopCooldownEndTime: 0,
@@ -1594,6 +1595,7 @@
     player.onGround = true; 
     player.currentPlatform = null;
     player.preHitVx = 0;
+    player.isWallBouncing = false; // 【追加】壁から跳ね返り中の制御不能フラグ
     
     player.jumpStartX = player.x;
     player.jumpStartY = player.y;
@@ -1756,19 +1758,38 @@
     } else if (hitStopEndTime > now) {
       player.vx = 0; 
     } else {
+      // よじ登り失敗時のノックバック処理（②の場合は跳ね返らない）
       if (player.wallHitPlatform !== null && !player.isClimbing) {
           if (player.wallHitDir === 1 || player.wallHitDir === -1) {
-              let bounceVx = -player.preHitVx;
-              if (player.wallHitDir === 1 && bounceVx > -2) bounceVx = -2;
-              if (player.wallHitDir === -1 && bounceVx < 2) bounceVx = 2;
-              
-              player.airVx = bounceVx;
-              player.vx = player.airVx;
-              player.vy = -3; 
+              if (player.wallHitType === 2) {
+                  // ②（下半分）の接触時は跳ね返らずに真下へ落下
+                  player.airVx = 0;
+                  player.vx = 0;
+                  player.vy = 0;
+              } else {
+                  // ①（上半分）と③（全体）は反転してノックバック
+                  // 【修正】推進力の85%で反対方向へ
+                  let bounceVx = -player.preHitVx * 0.85;
+                  // 最低限の反発力を保証して壁への再癒着を防止
+                  if (player.wallHitDir === 1 && bounceVx > -2) bounceVx = -2;
+                  if (player.wallHitDir === -1 && bounceVx < 2) bounceVx = 2;
+                  
+                  player.airVx = bounceVx;
+                  player.vx = player.airVx;
+                  // 【修正】斜め上へ跳ね返るようにY軸の推進力を追加
+                  player.vy = -7; 
+                  // 【修正】上昇中のジャイロ制御不能フラグをオン
+                  player.isWallBouncing = true;
+              }
               player.onGround = false;
           }
           player.wallHitPlatform = null;
           player.wallHitDir = 0;
+      }
+
+      // 【追加】跳ね返りで上昇している間はジャイロ操作無効、落下開始で再開
+      if (player.isWallBouncing && player.vy >= 0) {
+          player.isWallBouncing = false;
       }
 
       if (isNormalConfused || isBigFallConfused) {
@@ -1792,6 +1813,11 @@
       } else if (isNormalConfused) {
           let confMult = (inTutorial && !IS_TEST_MODE) ? 1.1 : 1.3;
           activeTilt = -effectiveTilt * confMult;
+      }
+
+      // 【追加】上昇中はジャイロの傾き入力を0にして無視する
+      if (player.isWallBouncing) {
+          activeTilt = 0;
       }
 
       activeTilt += slipTilt;
@@ -2451,29 +2477,20 @@
 
     ctx.translate(cx, cy);
 
-    // ---------------------------------------------------------
-    // 【ユーザー提案の採用】キャラクターのローカル座標系内でアイコンを描画
-    // スライムの(0, 0)は底面。頭頂部は -sh 付近。
-    // ---------------------------------------------------------
-    
-    // 1. 混乱アイコン
     if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
         ctx.font = "16px 'DotGothic16', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         let wobble = Math.sin(now / 50) * 5;
-        // キャラクターの物理中心(player.x)からの差分を利用し、確実にスライムの頭上に配置
         let iconLocalX = (player.x - cx) + wobble;
         let iconLocalY = -sh - 16; 
         ctx.fillText("💫", iconLocalX, iconLocalY);
     }
 
-    // 2. よじ登りアイコン
     let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;
     if (isWallHit || player.isClimbing) {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        // ローカル座標において cx は壁の接点なので、そこから壁側へ少しズラす
         let localIconX = (player.wallHitDir === 1) ? -18 : 18;
         let localIconY = -sh - 5; 
         
@@ -2488,7 +2505,6 @@
             ctx.fillText("🖐️", localIconX, localIconY + bounce);
         }
     }
-    // ---------------------------------------------------------
 
     let grad = ctx.createLinearGradient(0, -sh, 0, sh*0.5);
     grad.addColorStop(0, '#4fc3f7');
