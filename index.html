@@ -1360,7 +1360,6 @@
     return active;  
   }  
 
-  // 外側の傾斜面に沿ったX座標を取得する関数
   function getLeftWallX(p, targetY) {
       let S = (p.slope || 0) * Math.PI / 180;
       return p.x - (targetY - p.y) * Math.tan(S);
@@ -2028,7 +2027,6 @@
             let hitFromAbove = (oBottom <= oldSurfaceY + 15) || (wasOnGround && player.vy >= -2);  
             let hitFromBelow = oTop >= bottomY - 12;  
             
-            // 物理的な壁判定を傾斜に合わせる
             let targetEdgeY = Math.max(p.y, oBottom);
             let hitFromLeft  = oRight <= getLeftWallX(p, targetEdgeY) + 12;  
             let hitFromRight = oLeft >= getRightWallX(p, targetEdgeY) - 12;  
@@ -2143,11 +2141,17 @@
               else hType = 3;                         
   
               // 傾斜角に合わせて座標をスナップ
+              // 足場の上角とキャラクターの先端(描画上の上端)がぴったり重なるようにY座標を調整
+              let S_rad = (p.slope || 0) * Math.PI / 180;
+              let sh = player.size;
+              player.y = wTop + (sh * 0.85) * Math.cos(S_rad);
+
               if (hitFromLeft) player.x = getLeftWallX(p, player.y) - rMax;  
               else player.x = getRightWallX(p, player.y) + rMax;  
                 
               player.airVx = 0;  
               player.vx = 0;  
+              player.vy = 0; // 追加: 壁面にぶつかった瞬間、進行方向エネルギーを0にする
                 
               if (!wasOnGround && player.hitStopCooldownEndTime <= now) {  
                   if (distFromStart >= player.size) {  
@@ -2163,8 +2167,6 @@
                       player.wallHitDir = hitFromLeft ? 1 : -1;   
                       player.wallHitType = hType;  
                       player.wallHitPlatform = p;  
-                        
-                      player.y = wTop;  
                   }  
               }  
             }  
