@@ -750,18 +750,14 @@
       ctx.fill();
   }
 
-  // 【変更】石ブロック足場の描画関数（側面の傾きを解消し、y軸と平行にする対応）
   function drawStonePlatform(ctx, p) {
       ctx.save();
       ctx.translate(p.x, p.y);
-      // 外側の傾きをなくすため、ctx.rotate は使用しません。
       
       let tan = Math.tan((p.slope || 0) * Math.PI / 180);
       let oL = p.offsetLeft || 0;
       let oR = p.offsetRight || 0;
 
-      // クリッピングパスをグローバル座標系(translate後)で作成
-      // 外側の場合は oL や oR が 0 になり、完全に垂直（y軸平行）になります。
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(p.w, p.w * tan);
@@ -774,7 +770,6 @@
       let cols = ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#646464', '#2a2a2a'];
       let seed = p.x * 1.3 + p.y * 2.7;
       
-      // 描画領域をカバーするために少し余裕をもたせる
       let minX = Math.min(0, oL, p.w, p.w + oR) - 20;
       let maxX = Math.max(0, oL, p.w, p.w + oR) + 20;
       let drawW = maxX - minX;
@@ -782,11 +777,9 @@
       let minY = Math.min(0, p.w * tan) - 20;
       let maxY = Math.max(p.h, p.w * tan + p.h) + 20;
       
-      // 目地（背景）
       ctx.fillStyle = '#222';
       ctx.fillRect(minX, minY, drawW, maxY - minY);
 
-      // ブロック（傾斜に合わせて斜めに描画させる）
       ctx.transform(1, tan, 0, 1, 0, 0);
       
       for (let y = 0; y < p.h; y += bH) {
@@ -1246,7 +1239,6 @@
         }; 
     }
     
-    // 【変更】グローバル座標系での足場の変形量（X方向のオフセット）算出
     for (let i = 0; i < pObjs.length; i++) {
         pObjs[i].isLeftConnected = (i > 0);
         pObjs[i].isRightConnected = (i < pObjs.length - 1);
@@ -1254,11 +1246,9 @@
         let sCurrent = pObjs[i].slope || 0;
         let rad = Math.PI / 180;
         
-        // 左側の変形量 (法線方向の平均から算出)
         pObjs[i].offsetLeft = pObjs[i].isLeftConnected 
             ? -pObjs[i].h * Math.tan(((pObjs[i-1].slope || 0) + sCurrent) / 2 * rad) 
             : 0;
-        // 右側の変形量
         pObjs[i].offsetRight = pObjs[i].isRightConnected 
             ? -pObjs[i].h * Math.tan((sCurrent + (pObjs[i+1].slope || 0)) / 2 * rad) 
             : 0;
@@ -2423,8 +2413,12 @@
         let p = player.wallHitPlatform;
         if (p) {
             let wallFaceX = (player.wallHitDir === 1) ? p.x : p.x + p.w;
+            let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
+            let cornerY = p.y + (wallFaceX - p.x) * tan;
+            
             cx = wallFaceX; 
-            cy = player.y; 
+            // 先端が足場の上辺角に来るように調整
+            cy = cornerY + sw * 0.35; 
 
             if (player.isClimbing) {
                 let ratio = (now - player.climbStartTime) / player.climbDuration;
@@ -2433,6 +2427,9 @@
                     t = Math.sin(t * Math.PI / 2);
                     cx = cx + (player.x - cx) * t;
                     cy = cy + ((player.y + sh/2) - cy) * t;
+                } else {
+                    // よじ登り前半の縦移動を反映
+                    cy += (player.y - player.climbStartY);
                 }
             }
         }
@@ -2543,29 +2540,30 @@
     }
     ctx.restore();
 
+    // アイコンの座標を見た目(cx, cy)に追従させるように修正
     if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
       ctx.font = "16px 'DotGothic16', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       let wobble = Math.sin(now / 50) * 5;
-      ctx.fillText("💫", player.x - cameraX + wobble, player.y - cameraY - player.size/2 - 12);
+      ctx.fillText("💫", cx - cameraX + wobble, cy - cameraY - player.size - 12);
     }
 
     let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;
     if (isWallHit || player.isClimbing) {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let iconX = player.x + (player.wallHitDir * 15);
+      let iconX = cx + (player.wallHitDir * 15);
       
       if (player.isClimbing) {
         let flash = Math.floor(now / 50) % 2 === 0;
         ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";
         ctx.globalAlpha = 1.0; 
-        ctx.fillText("🖐️", iconX - cameraX, player.y - cameraY - player.size/2 - 15);
+        ctx.fillText("🖐️", iconX - cameraX, cy - cameraY - player.size - 15);
       } else {
         ctx.font = "20px 'DotGothic16', sans-serif";
         let bounce = Math.sin(now / 100) * 3;
-        ctx.fillText("🖐️", iconX - cameraX, player.y - cameraY - player.size/2 - 15 + bounce);
+        ctx.fillText("🖐️", iconX - cameraX, cy - cameraY - player.size - 15 + bounce);
       }
     }
 
