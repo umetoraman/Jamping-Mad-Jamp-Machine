@@ -1,0 +1,2644 @@
+<!DOCTYPE html>  
+<html lang="ja">  
+<head>  
+<meta charset="UTF-8">  
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">  
+<!-- 検索エンジンのインデックスを拒否 -->
+<meta name="robots" content="noindex, nofollow">
+<title>Jumping Mad Jump Machine</title>  
+<link rel="preconnect" href="https://fonts.googleapis.com">  
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>  
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">  
+<style>  
+  body, html {  
+    margin: 0; padding: 0; width: 100%; height: 100%;  
+    overflow: hidden; background-color: #e0f7fa;   
+    touch-action: none;  
+    -webkit-touch-callout: none;  
+    -webkit-user-select: none;  
+    user-select: none;  
+    font-family: 'DotGothic16', sans-serif;  
+  }  
+  canvas {  
+    display: block; width: 100%; height: 100%;  
+  }  
+
+  /* --- パスコードロック画面のスタイル --- */
+  #lockScreen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    color: white; z-index: 100000;
+  }
+  #lockScreen h2 {
+    color: #ffd700; margin-bottom: 10px; text-shadow: 2px 2px 0 #000;
+  }
+  #lockScreen p {
+    font-size: 16px; margin-bottom: 20px; text-align: center; line-height: 1.6;
+  }
+  #passcodeInput {
+    font-size: 24px; padding: 10px; margin-bottom: 20px; width: 150px; 
+    text-align: center; font-family: 'DotGothic16', sans-serif;
+    border: 3px solid #333; border-radius: 5px; outline: none;
+  }
+  #unlockBtn {
+    padding: 10px 40px; font-size: 20px; background: #4caf50; color: white;
+    border: 3px solid #fff; border-radius: 5px; cursor: pointer;
+    font-family: 'DotGothic16', sans-serif; font-weight: bold;
+    box-shadow: 3px 3px 0px rgba(0,0,0,0.5);
+  }
+  #unlockBtn:active {
+    transform: translate(3px, 3px); box-shadow: 0px 0px 0px rgba(0,0,0,0.5);
+  }
+  #lockError {
+    color: #ff5252; font-weight: bold; margin-top: 15px; display: none;
+  }
+    
+  #uiLayer {  
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;  
+    pointer-events: none;   
+    display: none;   
+  }  
+    
+  #scoreBoard {  
+    position: absolute; top: 20px; left: 20px;  
+    font-size: 20px; color: #333;  
+    background: rgba(240, 240, 240, 0.75);   
+    padding: 10px 15px; border-radius: 10px;  
+    border: 2px solid rgba(51, 51, 51, 0.8);  
+    pointer-events: auto;  
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.3);  
+    white-space: nowrap;  
+    min-width: 170px;  
+  }  
+    
+  #pauseBtn {  
+    position: absolute; top: 20px; right: 20px;  
+    width: 60px; height: 60px;  
+    background: rgba(240, 240, 240, 0.75);   
+    border: 2px solid rgba(51, 51, 51, 0.8);  
+    border-radius: 10px;  
+    pointer-events: auto;  
+    display: flex; flex-direction: column;  
+    justify-content: center; align-items: center;  
+    cursor: pointer;  
+    color: #333;  
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.3);  
+  }  
+  #pauseBtn:active {  
+    background: rgba(220, 220, 220, 0.9);  
+    transform: translate(2px, 2px);  
+    box-shadow: 0px 0px 0px rgba(0,0,0,0.3);  
+  }  
+  .pause-text {  
+    font-size: 13px;  
+    font-weight: bold;  
+    margin-bottom: 2px;  
+  }  
+  .pause-icon {  
+    font-size: 24px;  
+    line-height: 1;  
+    margin-top: 2px;  
+  }  
+  
+  #testModeUI {  
+    position: absolute;  
+    top: 110px;  
+    right: 20px;  
+    color: red;  
+    font-size: 22px;  
+    font-weight: bold;  
+    text-shadow: 2px 2px 0px #fff, -2px -2px 0px #fff, 2px -2px 0px #fff, -2px 2px 0px #fff;  
+    display: none;  
+    z-index: 50;  
+  }  
+  
+  #messageBanner {  
+    position: absolute;  
+    top: 35%;   
+    transform: translateY(-50%);  
+    left: 0;  
+    width: 100%;  
+    background: rgba(50, 50, 50, 0.9);   
+    color: white;  
+    text-align: center;  
+    padding: 20px 10px;  
+    box-sizing: border-box;  
+    font-size: 18px;   
+    opacity: 0;  
+    pointer-events: none;  
+    line-height: 1.6;  
+    border-top: 3px solid rgba(255, 255, 255, 0.6);  
+    border-bottom: 3px solid rgba(255, 255, 255, 0.6);  
+  }  
+  
+  #achievementBanner {  
+    position: absolute;  
+    top: 15%;   
+    left: 50%;  
+    transform: translateX(-50%);  
+    background: linear-gradient(135deg, #ffd700, #ff8c00);   
+    color: #fff;  
+    padding: 15px 30px;  
+    border-radius: 10px;  
+    border: 4px solid #fff;  
+    text-align: center;  
+    font-weight: bold;  
+    opacity: 0;  
+    pointer-events: none;  
+    transition: opacity 0.5s ease-in-out;  
+    z-index: 100;  
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);  
+    text-shadow: 1px 1px 2px #000;  
+    width: 80%;  
+    max-width: 400px;  
+  }  
+  
+  .modal-overlay {  
+    position: absolute;  
+    top: 0; left: 0; width: 100%; height: 100%;  
+    background: rgba(0, 0, 0, 0.6);  
+    display: flex;  
+    justify-content: center;  
+    align-items: center;  
+    pointer-events: auto;  
+    z-index: 20;  
+  }  
+  .menu-box {  
+    background: rgba(224, 247, 250, 0.9);   
+    border: 4px solid rgba(51, 51, 51, 0.9);  
+    border-radius: 10px;  
+    padding: 20px;  
+    text-align: center;  
+    width: 85%;  
+    max-width: 320px;  
+    color: #333;  
+    box-shadow: 4px 4px 0px rgba(0,0,0,0.5);  
+  }  
+  .menu-tile {  
+    display: block;  
+    width: 100%;  
+    margin: 10px 0;  
+    padding: 12px 0;  
+    font-size: 18px;  
+    background: rgba(255, 255, 255, 0.85);  
+    border: 4px solid rgba(51, 51, 51, 0.9);  
+    color: #333;  
+    cursor: pointer;  
+    font-family: 'DotGothic16', sans-serif;  
+    font-weight: bold;  
+    border-radius: 5px;  
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.3);  
+  }  
+  .menu-tile:active {  
+    transform: translate(2px, 2px);  
+    box-shadow: 0px 0px 0px rgba(0,0,0,0.3);  
+  }  
+  .confirm-title { font-size: 18px; margin-bottom: 15px; font-weight: bold; }  
+  .confirm-taunt { font-size: 22px; color: #d32f2f; margin-bottom: 20px; font-weight: bold; line-height: 1.4;}  
+  .confirm-note { font-size: 13px; color: #555; margin-top: 15px; text-align: left;}  
+  .confirm-buttons {  
+    display: flex;  
+    justify-content: space-between;  
+    gap: 10px;  
+  }  
+  .confirm-buttons .menu-tile {  
+    margin: 0;  
+    flex: 1;  
+  }  
+  
+  input[type=range] {  
+      -webkit-appearance: none;  
+      width: 100%;  
+      background: transparent;  
+      margin-top: 10px;  
+  }  
+  input[type=range]::-webkit-slider-thumb {  
+      -webkit-appearance: none;  
+      height: 20px;  
+      width: 20px;  
+      border-radius: 50%;  
+      background: #2196f3;  
+      cursor: pointer;  
+      margin-top: -8px;   
+      border: 2px solid #333;  
+  }  
+  input[type=range]::-webkit-slider-runnable-track {  
+      width: 100%;  
+      height: 6px;  
+      cursor: pointer;  
+      background: #ccc;  
+      border-radius: 3px;  
+      border: 1px solid #333;  
+  }  
+  
+  #startScreen {  
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;  
+    background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column;  
+    justify-content: center; align-items: center; color: white;  
+    pointer-events: auto; z-index: 30;  
+  }  
+  h1 { font-size: 32px; margin-bottom: 10px; color: #4fc3f7; text-shadow: 3px 3px 0 #000; text-align: center; line-height: 1.2;}  
+  button.start-btn {  
+    padding: 15px 40px; font-size: 20px;   
+    background: #4caf50; color: white; border: 4px solid #fff;  
+    border-radius: 0px; cursor: pointer;  
+    font-family: 'DotGothic16', sans-serif;  
+    box-shadow: 4px 4px 0px rgba(0,0,0,0.5);  
+  }  
+  button.start-btn:active {   
+    transform: translate(4px, 4px);  
+    box-shadow: 0px 0px 0px rgba(0,0,0,0.5);  
+  }  
+  
+  #fadeOverlay {  
+    position: absolute;  
+    top: 0; left: 0; width: 100%; height: 100%;  
+    background: black;  
+    opacity: 0;  
+    pointer-events: none;  
+    z-index: 9999;  
+    transition: opacity 1s ease-in-out;  
+  }  
+</style>  
+</head>  
+<body>  
+
+<!-- パスコードロック画面 -->
+<div id="lockScreen">
+  <h2>テスト環境ロック</h2>
+  <p>開発中のためアクセス制限がかかっています。<br>パスコードを入力してください。</p>
+  <input type="password" id="passcodeInput" placeholder="****" inputmode="numeric">
+  <button id="unlockBtn">解除</button>
+  <div id="lockError">コードが違います！</div>
+</div>
+  
+<div id="uiLayer">  
+  <div id="scoreBoard">  
+    現在: <span id="currentAlt">0</span> m<br>  
+    <span style="font-size:16px;">最高: <span id="maxAlt">0</span> m</span><br>  
+    <span style="font-size:16px;">ﾀｲﾑ: <span id="timeDisp">00:00:00.00</span></span><br>  
+    <span style="font-size:16px; color:#b8860b; font-weight:bold;">💰 <span id="coinDisp">0</span></span>  
+  </div>  
+  <div id="pauseBtn">  
+    <div class="pause-text">ポーズ</div>  
+    <div class="pause-icon">⏸</div>  
+  </div>  
+  <div id="testModeUI">テストプレイ中</div>  
+  <div id="messageBanner"></div>  
+  <div id="achievementBanner"></div>  
+</div>  
+  
+<div id="pauseMenu" class="modal-overlay" style="display: none;">  
+  <div class="menu-box">  
+    <div id="pauseMain">  
+      <div style="font-size:24px; margin-bottom: 20px; font-weight:bold;">一時停止</div>  
+      <button id="resumeBtn" class="menu-tile">ゲーム再開</button>  
+      <button id="settingsBtn" class="menu-tile">設定</button>  
+      <button id="toTitleBtn" class="menu-tile">タイトルへ戻る</button>  
+    </div>  
+      
+    <div id="pauseSettings" style="display: none;">  
+      <div class="confirm-title">設定</div>  
+      <div style="margin-bottom:15px; text-align:left; font-size:16px; font-weight:bold;">  
+          BGM 音量: <span id="bgmValDisp">100</span><br>  
+          <input type="range" id="bgmSlider" min="0" max="100" value="100">  
+      </div>  
+      <div style="margin-bottom:20px; text-align:left; font-size:16px; font-weight:bold;">  
+          SE 音量: <span id="seValDisp">100</span><br>  
+          <input type="range" id="seSlider" min="0" max="100" value="100">  
+      </div>  
+      <button id="closeSettingsBtn" class="menu-tile">戻る</button>  
+    </div>  
+  
+    <div id="pauseConfirm" style="display: none;">  
+      <div class="confirm-title">タイトルに戻りますか？</div>  
+      <div class="confirm-taunt">今の君には、<br>この足場を登るのは<br>無理かな?</div>  
+      <div class="confirm-buttons">  
+        <button id="confirmYesBtn" class="menu-tile">はい</button>  
+        <button id="confirmNoBtn" class="menu-tile">いいえ</button>  
+      </div>  
+      <div class="confirm-note">※タイトルへ戻ると現在のスコアと足場のデータはすべて失われます。</div>  
+    </div>  
+  </div>  
+</div>  
+  
+<div id="startScreen">  
+  <h1 id="titleText">Jumping Mad<br>Jump Machine</h1>  
+  <p>  
+    📱 傾きで移動 / 👆 画面長押しでジャンプ<br>  
+    ※1秒間に3回タップでジャイロの基準位置リセット<br>  
+    頭を打つと操作が反転＆溜めができなくなります。  
+  </p>  
+  <button id="startBtn" class="start-btn">スタート</button>  
+</div>  
+  
+<div id="fadeOverlay"></div>  
+  
+<canvas id="gameCanvas"></canvas>  
+  
+<script>  
+  // --- パスコードロック処理 ---
+  const SECRET_CODE = "7777"; // ★ここを変更するとパスコードが変わります
+  
+  const lockScreen = document.getElementById('lockScreen');
+  const unlockBtn = document.getElementById('unlockBtn');
+  const passcodeInput = document.getElementById('passcodeInput');
+  const lockError = document.getElementById('lockError');
+
+  unlockBtn.addEventListener('click', () => {
+    if(passcodeInput.value === SECRET_CODE) {
+      lockScreen.style.display = 'none';
+    } else {
+      lockError.style.display = 'block';
+      passcodeInput.value = '';
+    }
+  });
+
+  passcodeInput.addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') unlockBtn.click();
+  });
+  // -------------------------
+
+  const IS_TEST_MODE = true;   
+  
+  const canvas = document.getElementById('gameCanvas');  
+  const ctx = canvas.getContext('2d');  
+  const startScreen = document.getElementById('startScreen');  
+  const startBtn = document.getElementById('startBtn');  
+  const currentAltElement = document.getElementById('currentAlt');  
+  const maxAltElement = document.getElementById('maxAlt');  
+  const timeDisp = document.getElementById('timeDisp');   
+  const coinDisp = document.getElementById('coinDisp');   
+  const messageBanner = document.getElementById('messageBanner');  
+  const achievementBanner = document.getElementById('achievementBanner');  
+  const testModeUI = document.getElementById('testModeUI');  
+  const fadeOverlay = document.getElementById('fadeOverlay');  
+    
+  const uiLayer = document.getElementById('uiLayer');  
+  const pauseBtn = document.getElementById('pauseBtn');  
+  const pauseMenu = document.getElementById('pauseMenu');  
+  const pauseMain = document.getElementById('pauseMain');  
+  const pauseSettings = document.getElementById('pauseSettings');  
+  const pauseConfirm = document.getElementById('pauseConfirm');  
+    
+  const resumeBtn = document.getElementById('resumeBtn');  
+  const settingsBtn = document.getElementById('settingsBtn');  
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');  
+  const toTitleBtn = document.getElementById('toTitleBtn');  
+  const confirmYesBtn = document.getElementById('confirmYesBtn');  
+  const confirmNoBtn = document.getElementById('confirmNoBtn');  
+  
+  const bgmSlider = document.getElementById('bgmSlider');  
+  const seSlider = document.getElementById('seSlider');  
+  const bgmValDisp = document.getElementById('bgmValDisp');  
+  const seValDisp = document.getElementById('seValDisp');  
+  
+  let width = window.innerWidth;  
+  let height = window.innerHeight;  
+  canvas.width = width;  
+  canvas.height = height;  
+  
+  const STAGE_EXPAND = 64;  
+  const LIMIT_LEFT = -STAGE_EXPAND;  
+  const LIMIT_RIGHT = width + STAGE_EXPAND;  
+  
+  let isPlaying = false;  
+  let isPaused = false;  
+  let pauseTimeStart = 0;   
+  
+  let timerRunning = false;  
+  let elapsedMs = 0;  
+  let lastFrameTime = 0;  
+  
+  let tilt = 0;  
+  let isPressing = false;       
+  let isPointerDown = false;    
+  let pressStartTime = 0;  
+  let lastReleaseTime = 0;   
+  
+  let tapTimes = [];  
+  let systemMessage = "";  
+  let systemMessageEndTime = 0;  
+  let achTimer = null;   
+  
+  let cameraY = 0;  
+  let cameraX = 0;   
+  let maxAltitude = 0;   
+  let bestScore = 0;     
+  let totalCoins = 0;    
+  let floatingTexts = [];   
+  
+  let achievements = { story: false, extra: false, final: false };  
+  let sessionFlags = { story: false, extra: false, final: false };  
+  let unlockedSkins = [];  
+  
+  let hitStopEndTime = 0;  
+  let nextSafetyLevel = 1;   
+  
+  let bigFallStartTime = 0;  
+  let currentBigFallMessage = "";  
+    
+  let bgmVolume = 1.0;   
+  let seVolume = 1.0;    
+    
+  const BGM_DIR = 'audio/bgm/';  
+  const bgmTitle = new Audio(BGM_DIR + 'タイトル.mp3');  
+  bgmTitle.loop = true;  
+  const bgmGame = new Audio(BGM_DIR + '地上付近.mp3');  
+  bgmGame.loop = true;  
+  
+  let currentBgm = null;  
+  let bgmFadeInterval = null;  
+    
+  const AudioContext = window.AudioContext || window.webkitAudioContext;  
+  let audioCtx;  
+  
+  let clouds = [];  
+  const PARALLAX_FACTOR_CLOUD = 0.15;   
+  
+  function pRand(s) {  
+      let h = Math.sin(s) * 43758.5453123;  
+      return h - Math.floor(h);  
+  }  
+  
+  function saveData() {  
+      localStorage.setItem('jm_totalCoins', totalCoins);  
+      localStorage.setItem('jm_bestScore', bestScore);  
+      localStorage.setItem('jm_achievements', JSON.stringify(achievements));  
+      localStorage.setItem('jm_unlockedSkins', JSON.stringify(unlockedSkins));  
+  }  
+  function loadData() {  
+      let savedCoins = localStorage.getItem('jm_totalCoins');  
+      if (savedCoins) totalCoins = parseInt(savedCoins);  
+      let savedScore = localStorage.getItem('jm_bestScore');  
+      if (savedScore) bestScore = parseInt(savedScore);  
+      let savedAch = localStorage.getItem('jm_achievements');  
+      if (savedAch) achievements = JSON.parse(savedAch);  
+      let savedSkins = localStorage.getItem('jm_unlockedSkins');  
+      if (savedSkins) unlockedSkins = JSON.parse(savedSkins);  
+  
+      coinDisp.innerText = totalCoins;  
+      maxAltElement.innerText = bestScore;  
+  }  
+  loadData();   
+  
+  function addFloatingText(x, y, text, color) {  
+      floatingTexts.push({x: x, y: y, text: text, color: color, life: 60, maxLife: 60});  
+  }  
+  
+  function showAchievement(title, desc) {  
+      achievementBanner.innerHTML = `<div style="font-size:22px;margin-bottom:8px;">${title}</div><div style="font-size:16px;">${desc.replace(/\n/g, '<br>')}</div>`;  
+      achievementBanner.style.opacity = '1';  
+        
+      playOscillator('triangle', 400, 800, 0.2, 0.6);  
+      setTimeout(() => playOscillator('triangle', 600, 1200, 0.2, 0.6), 200);  
+      setTimeout(() => playOscillator('sine', 800, 1600, 0.4, 0.6), 400);  
+  
+      if(achTimer) clearTimeout(achTimer);  
+      achTimer = setTimeout(() => {  
+          achievementBanner.style.opacity = '0';  
+      }, 5000);  
+  }  
+  
+  function initAudio() {  
+      if (!audioCtx) audioCtx = new AudioContext();  
+      if (audioCtx.state === 'suspended') audioCtx.resume();  
+  }  
+  
+  function playOscillator(type, startFreq, endFreq, duration, vol) {  
+      if (!audioCtx) return;  
+      if (audioCtx.state === 'suspended') audioCtx.resume();  
+      const osc = audioCtx.createOscillator();  
+      const gain = audioCtx.createGain();  
+      osc.type = type;  
+      osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);  
+      if (endFreq !== null) {  
+          osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + duration);  
+      }  
+      gain.gain.setValueAtTime(vol * seVolume, audioCtx.currentTime);  
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);  
+      osc.connect(gain);  
+      gain.connect(audioCtx.destination);  
+      osc.start();  
+      osc.stop(audioCtx.currentTime + duration);  
+  }  
+  
+  function playNoise(duration, vol) {  
+      if (!audioCtx) return;  
+      if (audioCtx.state === 'suspended') audioCtx.resume();  
+      const bufferSize = audioCtx.sampleRate * duration;  
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);  
+      const data = buffer.getChannelData(0);  
+      for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }  
+      const noise = audioCtx.createBufferSource();  
+      noise.buffer = buffer;  
+      const gain = audioCtx.createGain();  
+      gain.gain.setValueAtTime(vol * seVolume, audioCtx.currentTime);  
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);  
+        
+      const filter = audioCtx.createBiquadFilter();  
+      filter.type = 'lowpass';  
+      filter.frequency.value = 1000;  
+        
+      noise.connect(filter);  
+      filter.connect(gain);  
+      gain.connect(audioCtx.destination);  
+      noise.start();  
+  }  
+  
+  function createSlimeBloop(startFreq, endFreq, duration) {  
+      if (!audioCtx) return;  
+      if (audioCtx.state === 'suspended') audioCtx.resume();  
+      const startTime = audioCtx.currentTime;  
+      const osc = audioCtx.createOscillator();  
+      const gain = audioCtx.createGain();  
+  
+      osc.type = 'sine';   
+      osc.connect(gain);  
+      gain.connect(audioCtx.destination);  
+  
+      osc.frequency.setValueAtTime(startFreq, startTime);  
+      osc.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);  
+  
+      gain.gain.setValueAtTime(0, startTime);  
+      gain.gain.linearRampToValueAtTime(0.5 * seVolume, startTime + duration * 0.2);  
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);  
+  
+      osc.start(startTime);  
+      osc.stop(startTime + duration);  
+  }  
+  
+  function createSlimeLand() {  
+      if (!audioCtx) return;  
+      if (audioCtx.state === 'suspended') audioCtx.resume();  
+      const startTime = audioCtx.currentTime;  
+        
+      const thudOsc = audioCtx.createOscillator();  
+      const thudGain = audioCtx.createGain();  
+      thudOsc.type = 'triangle';  
+        
+      thudOsc.connect(thudGain);  
+      thudGain.connect(audioCtx.destination);  
+        
+      thudOsc.frequency.setValueAtTime(150, startTime);  
+      thudOsc.frequency.exponentialRampToValueAtTime(30, startTime + 0.15);   
+        
+      thudGain.gain.setValueAtTime(0, startTime);  
+      thudGain.gain.linearRampToValueAtTime(0.6 * seVolume, startTime + 0.02);   
+      thudGain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);  
+        
+      thudOsc.start(startTime);  
+      thudOsc.stop(startTime + 0.15);  
+  
+      const splashOsc = audioCtx.createOscillator();  
+      const splashGain = audioCtx.createGain();  
+      splashOsc.type = 'sine';  
+        
+      splashOsc.connect(splashGain);  
+      splashGain.connect(audioCtx.destination);  
+        
+      splashOsc.frequency.setValueAtTime(800, startTime);  
+      splashOsc.frequency.exponentialRampToValueAtTime(200, startTime + 0.1);   
+        
+      splashGain.gain.setValueAtTime(0, startTime);  
+      splashGain.gain.linearRampToValueAtTime(0.4 * seVolume, startTime + 0.02);  
+      splashGain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);  
+        
+      splashOsc.start(startTime);  
+      splashOsc.stop(startTime + 0.1);  
+  }  
+  
+  function playSeHitLight() {   
+      playNoise(0.1, 0.4);   
+      playOscillator('square', 100, 50, 0.1, 0.2);   
+      createSlimeLand();   
+  }  
+    
+  function playSeHitHeavy() {   
+      playNoise(0.3, 0.7);   
+      playOscillator('sine', 80, 20, 0.3, 0.6);   
+      createSlimeLand();   
+  }  
+    
+  function playSeFall() { playOscillator('sine', 800, 100, 1.2, 0.5); }  
+  function playSeCrash() { playNoise(0.5, 0.9); playOscillator('sine', 50, 10, 0.5, 0.8); }  
+  function playSeClimb() { playOscillator('sawtooth', 300, 600, 0.15, 0.3); }  
+  function playSeJump() { createSlimeBloop(400, 800, 0.2); }  
+  function playSeCharge() { playOscillator('triangle', 200, 400, 0.1, 0.7); }  
+    
+  function playSeChestOpen(type) {  
+      if (type === 'diamond' || type === 'gold') {  
+          playOscillator('sine', 800, 1600, 0.1, 0.5);  
+          setTimeout(() => playOscillator('sine', 1000, 2000, 0.15, 0.5), 100);  
+      } else {  
+          playOscillator('sine', 800, 1200, 0.1, 0.5);  
+      }  
+  }  
+  
+  function fadeInBgm(targetBgm, durationMs) {  
+      if (currentBgm && currentBgm !== targetBgm) {  
+          currentBgm.pause();  
+          currentBgm.currentTime = 0;  
+      }  
+      currentBgm = targetBgm;  
+      currentBgm.volume = 0;  
+      currentBgm.play().catch(e => console.log("BGM再生不可:", e));  
+  
+      const steps = 20;  
+      const stepTime = durationMs / steps;  
+      let step = 0;  
+  
+      if (bgmFadeInterval) clearInterval(bgmFadeInterval);  
+      bgmFadeInterval = setInterval(() => {  
+          step++;  
+          let vol = bgmVolume * (step / steps);  
+          if (vol > 1) vol = 1;  
+          if (currentBgm) currentBgm.volume = vol;  
+          if (step >= steps) clearInterval(bgmFadeInterval);  
+      }, stepTime);  
+  }  
+  
+  function fadeOutBgm(durationMs, callback) {  
+      if (!currentBgm) {  
+          if(callback) callback();  
+          return;  
+      }  
+      const startVol = currentBgm.volume;  
+      const steps = 20;  
+      const stepTime = durationMs / steps;  
+      let step = 0;  
+  
+      if (bgmFadeInterval) clearInterval(bgmFadeInterval);  
+      bgmFadeInterval = setInterval(() => {  
+          step++;  
+          let vol = startVol * (1 - (step / steps));  
+          if (vol < 0) vol = 0;  
+          if (currentBgm) currentBgm.volume = vol;  
+          if (step >= steps) {  
+              clearInterval(bgmFadeInterval);  
+              if (currentBgm) {  
+                  currentBgm.pause();  
+                  currentBgm.currentTime = 0;  
+              }  
+              currentBgm = null;  
+              if (callback) callback();  
+          }  
+      }, stepTime);  
+  }  
+  
+  const initAudioHandler = () => {  
+      initAudio();  
+      if (!isPlaying && startScreen.style.display !== 'none' && !currentBgm) {  
+          fadeInBgm(bgmTitle, 1000);  
+      }  
+      window.removeEventListener('pointerdown', initAudioHandler);  
+  };  
+  window.addEventListener('pointerdown', initAudioHandler);  
+  
+  const bigFallMessages = [  
+    "ヒュー！見事な落下！…さあ、最初からやり直そっか！",  
+    "あーあ…でも、まだまだここからだよね？",  
+    "ナイス着地！…予定通りだよね？（震え声）",  
+    "地球の重力には逆らえなかったよ…どんまい！",  
+    "…今の、見なかったことにしてあげるから次行こ！",  
+    "すごい勢いだったね！…下に向かってだけど。",  
+    "もしかして、下の様子を確認しに戻ってきたのかな？",  
+    "落下もスポーツの一部！…ってことでいい？",  
+    "今のダイブ、芸術点高かったよ！登り直しだけど！",  
+    "大丈夫！君の努力は無駄に…なったかも。"  
+  ];  
+  
+  const player = {  
+    x: width / 2,  
+    y: height - 50,  
+    size: 32,   
+    vx: 0,             
+    vy: 0,  
+    airVx: 0,          
+    gravity: 0.8,  
+    maxJumpPower: -16,   
+    speed: 0.4,        
+    airControl: 0.05,  
+    onGround: false,  
+    currentPlatform: null,  
+      
+    isClimbing: false,  
+    climbStartTime: 0,  
+    climbEndTime: 0,  
+    climbStartY: 0,  
+    climbStartX: 0,  
+    climbTargetY: 0,  
+    climbTargetX: 0,  
+    climbDuration: 500,   
+      
+    wallHitDir: 0,   
+    wallHitPlatform: null,  
+    wallHitType: 3,   
+      
+    confusionEndTime: 0,  
+    hitStopCooldownEndTime: 0,  
+    bigFallPenaltyEndTime: 0,   
+    highestYInAir: 0,  
+      
+    jumpStartX: width / 2,  
+    jumpStartY: height - 50,  
+    lastJumpChargeTime: 0,  
+    isBigFalling: false,  
+    hasPlayedFallSound: false,  
+    lastMoveSoundTime: 0   
+  };  
+  
+  let chunks = {};  
+  let generatedHighestPlatform = null;   
+  let initialSigns = [];  
+  
+  const CHUNK_METERS = 100;   
+  const PIXELS_PER_METER = 32;  
+  const CHUNK_HEIGHT_PX = CHUNK_METERS * PIXELS_PER_METER;   
+  
+  let baseQuat = [1, 0, 0, 0];  
+  let needsInitialCalibration = false;   
+  
+  function eulerToQuat(alpha, beta, gamma) {  
+      const deg2rad = Math.PI / 180;  
+      const a = (alpha || 0) * deg2rad / 2;  
+      const b = (beta || 0) * deg2rad / 2;  
+      const c = (gamma || 0) * deg2rad / 2;  
+  
+      const ca = Math.cos(a), sa = Math.sin(a);  
+      const cb = Math.cos(b), sb = Math.sin(b);  
+      const cc = Math.cos(c), sc = Math.sin(c);  
+  
+      const w = ca * cb * cc - sa * sb * sc;  
+      const x = ca * sb * cc - sa * cb * sc;  
+      const y = ca * cb * sc + sa * sb * cc;  
+      const z = sa * cb * cc + ca * sb * sc;  
+  
+      return [w, x, y, z];  
+  }  
+  
+  function multiplyQuat(q1, q2) {  
+      return [  
+          q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],  
+          q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],  
+          q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],  
+          q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]  
+      ];  
+  }  
+  
+  function invertQuat(q) {  
+      return [q[0], -q[1], -q[2], -q[3]];  
+  }  
+  
+  function getRelEuler(q) {  
+      const w = q[0], x = q[1], y = q[2], z = q[3];  
+      let sinb = 2 * (y*z + w*x);  
+      sinb = Math.max(-1, Math.min(1, sinb));  
+      let beta = Math.asin(sinb);  
+      let gamma = Math.atan2(-(2 * (x*z - w*y)), 1 - 2 * (x*x + y*y));  
+  
+      const rad2deg = 180 / Math.PI;  
+      return { beta: beta * rad2deg, gamma: gamma * rad2deg };  
+  }  
+  
+  function drawPlatformLayer(ctx, p, endY, yOffset, thickness, color) {  
+      ctx.fillStyle = color;  
+      ctx.beginPath();  
+      ctx.moveTo(p.x, p.y + yOffset);  
+      ctx.lineTo(p.x + p.w, endY + yOffset);  
+      ctx.lineTo(p.x + p.w, endY + yOffset + thickness);  
+      ctx.lineTo(p.x, p.y + yOffset + thickness);  
+      ctx.closePath();  
+      ctx.fill();  
+  }  
+  
+  // 石ブロック足場の描画関数（台形クリッピング適用）
+  function drawStonePlatform(ctx, p) {  
+      ctx.save();  
+      ctx.translate(p.x, p.y);  
+      
+      let currentSlope = p.slope || 0;
+      ctx.rotate(currentSlope * Math.PI / 180);  
+      
+      let dx_R = 0;
+      let dx_L = 0;
+      if (p.isRightConnected && p.rightSlope !== undefined) {
+          dx_R = p.h * Math.tan((currentSlope - p.rightSlope) / 2 * Math.PI / 180);
+      }
+      if (p.isLeftConnected && p.leftSlope !== undefined) {
+          dx_L = p.h * Math.tan((currentSlope - p.leftSlope) / 2 * Math.PI / 180);
+      }
+
+      // 台形クリッピングパス
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(p.w, 0);
+      ctx.lineTo(p.w + dx_R, p.h);
+      ctx.lineTo(dx_L, p.h);
+      ctx.closePath();
+      ctx.clip();
+        
+      let bH = 10;  
+      let cols = ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#646464', '#2a2a2a'];  
+      let seed = p.x * 1.3 + p.y * 2.7;  
+        
+      // 描画領域をクリッピングに合わせて拡張
+      let minX = Math.floor(Math.min(0, dx_L));
+      let maxX = Math.ceil(Math.max(p.w, p.w + dx_R));
+      let drawW = maxX - minX;
+
+      // 目地（背景）  
+      ctx.fillStyle = '#222';  
+      ctx.fillRect(minX, 0, drawW, p.h);  
+  
+      // ブロック  
+      for (let y = 0; y < p.h; y += bH) {  
+          let x = minX;  
+          let rowSeed = seed + y * 11.1;  
+          while (x < maxX) {  
+              let s = rowSeed + x * 7.3;  
+              let w = 12 + (pRand(s) * 16);  
+              if (x + w > maxX) w = maxX - x;  
+                
+              let colIdx = Math.floor(pRand(s + 1) * cols.length);  
+              ctx.fillStyle = cols[colIdx];  
+              ctx.fillRect(x + 1, y + 1, w - 2, bH - 2);  
+                
+              x += w;  
+          }  
+      }  
+      ctx.restore();  
+  }  
+  
+  function drawParapet(ctx, p) {  
+      ctx.save();  
+      ctx.translate(p.x, p.y);  
+      ctx.rotate((p.slope || 0) * Math.PI / 180);  
+        
+      let parapetH = 24;  
+      let bW = 20;  
+      let cols = ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#646464', '#2a2a2a'];  
+      let seed = p.x * 5.1 + p.y * 3.3;  
+        
+      for (let x = 0; x < p.w; x += bW) {  
+          let s = seed + x * 2.9;  
+          let isBroken = pRand(s) < 0.15;  
+          if (isBroken) continue;   
+            
+          let isDent = pRand(s + 1) < 0.5;   
+          let currentH = isDent ? parapetH * 0.6 : parapetH;  
+          let drawW = Math.min(bW, p.w - x);  
+            
+          let blockH = 12;  
+          for(let py = 0; py < currentH; py += blockH) {  
+              let bh = Math.min(blockH, currentH - py);  
+              let s2 = s + py * 1.7;  
+              let colIdx = Math.floor(pRand(s2) * cols.length);  
+              ctx.fillStyle = cols[colIdx];  
+                
+              let drawY = -py - bh;  
+              ctx.fillRect(x + 1, drawY + 1, drawW - 2, bh - 2);  
+                
+              ctx.strokeStyle = '#222';  
+              ctx.lineWidth = 2;  
+              ctx.strokeRect(x, drawY, drawW, bh);  
+          }  
+      }  
+      ctx.restore();  
+  }  
+  
+  function drawSlime(ctx, sw, sh, isCharging, tremble, bend = 0) {  
+      ctx.beginPath();  
+      let baseW = sw * 0.35;   
+      let midW = sw * 0.65;  
+      let topY = -sh * 0.85;  
+        
+      if (isCharging) {  
+          topY = -sh * 0.5 + tremble;  
+          midW = sw * 0.75 + tremble;  
+      }  
+        
+      let tx = (x, y) => x + bend * Math.pow(y / topY, 2) * sw * 0.5;  
+      let ty = (x, y) => y;  
+  
+      ctx.moveTo(tx(-baseW, 0), ty(-baseW, 0));   
+      ctx.bezierCurveTo(tx(-midW, 0), ty(-midW, 0), tx(-midW, topY), ty(-midW, topY), tx(0, topY), ty(0, topY));  
+      ctx.bezierCurveTo(tx(midW, topY), ty(midW, topY), tx(midW, 0), ty(midW, 0), tx(baseW, 0), ty(baseW, 0));  
+      ctx.quadraticCurveTo(tx(0, sh * 0.05), ty(0, sh * 0.05), tx(-baseW, 0), ty(-baseW, 0));  
+      ctx.closePath();  
+      ctx.fill();  
+      ctx.stroke();  
+  }  
+  
+  function drawTeardrop(ctx, r, frontStretch, backStretch, frontWidth, backWidth) {  
+      ctx.beginPath();  
+      ctx.moveTo(r * frontStretch, 0);  
+      ctx.bezierCurveTo(  
+          r * frontStretch, -frontWidth,   
+          -r * backStretch * 0.2, -backWidth,   
+          -r * backStretch, 0   
+      );  
+      ctx.bezierCurveTo(  
+          -r * backStretch * 0.2, backWidth,  
+          r * frontStretch, frontWidth,  
+          r * frontStretch, 0  
+      );  
+      ctx.closePath();  
+      ctx.fill();  
+      ctx.stroke();  
+  }  
+  
+  function createCloudParts() {  
+      let parts = [];  
+      let numParts = 4 + Math.floor(Math.random() * 4);  
+      let cx = 0;  
+      for (let i = 0; i < numParts; i++) {  
+          let w = (50 + Math.random() * 80) * 0.66;  
+          let h = (30 + Math.random() * 40) * 0.66;  
+          let dy = (Math.random() - 0.5) * 30;  
+          let op = 0.2 + Math.random() * 0.7;   
+          parts.push({x: cx, y: dy, w: w, h: h, op: op});  
+          cx += w * 0.6 + Math.random() * 20;   
+      }  
+      return { parts: parts, w: cx };   
+  }  
+  
+  function initClouds() {  
+      clouds = [];  
+      for (let i=0; i<15; i++) {  
+          clouds.push({  
+              x: Math.random() * width * 2 - width,  
+              y: Math.random() * height * 2 - height,  
+              speed: 0.1 + Math.random() * 0.3,  
+              data: createCloudParts()  
+          });  
+      }  
+  }  
+  
+  function getChestType(altMeters) {  
+      let rand = Math.random() * 100;  
+      if (altMeters < 1000) {  
+          if (rand < 90) return 'copper';  
+          if (rand < 98) return 'silver';  
+          return 'gold';   
+      } else if (altMeters < 2500) {  
+          if (rand < 70) return 'copper';  
+          if (rand < 90) return 'silver';  
+          if (rand < 98) return 'gold';  
+          return 'diamond';  
+      } else if (altMeters < 4000) {  
+          if (rand < 50) return 'copper';  
+          if (rand < 80) return 'silver';  
+          if (rand < 95) return 'gold';  
+          return 'diamond';  
+      } else {  
+          if (rand < 40) return 'copper';  
+          if (rand < 70) return 'silver';  
+          if (rand < 90) return 'gold';  
+          return 'diamond';  
+      }  
+  }  
+  
+  function openChest(type) {  
+      let rand = Math.random() * 100;  
+      if (type === 'copper') {  
+          if (rand < 80) return { coins: 10 };  
+          if (rand < 95) return { coins: 50 };  
+          if (rand < 99.5) return { coins: 200 };  
+          return { coins: 1000 };  
+      } else if (type === 'silver') {  
+          if (rand < 60) return { coins: 10 };  
+          if (rand < 85) return { coins: 50 };  
+          if (rand < 95) return { coins: 200 };  
+          if (rand < 98.5) return { coins: 1000 };  
+          if (rand < 99.5) return { coins: 2000 };  
+          return { coins: 0, skin: 'normal' };  
+      } else if (type === 'gold') {  
+          if (rand < 50) return { coins: 10 };  
+          if (rand < 80) return { coins: 50 };  
+          if (rand < 93) return { coins: 200 };  
+          if (rand < 98) return { coins: 1000 };  
+          if (rand < 99.5) return { coins: 2000 };  
+          return { coins: 0, skin: 'normal' };  
+      } else {   
+          if (rand < 40) return { coins: 10 };  
+          if (rand < 70) return { coins: 50 };  
+          if (rand < 88) return { coins: 200 };  
+          if (rand < 96) return { coins: 1000 };  
+          if (rand < 99) return { coins: 2000 };  
+          if (rand < 99.5) return { coins: 0, skin: 'normal' };  
+          return { coins: 0, skin: 'limited' };  
+      }  
+  }  
+  
+  function drawChest(ctx, type, x, y, slope) {  
+      ctx.save();  
+      ctx.translate(x, y);  
+      ctx.rotate(slope * Math.PI / 180);  
+  
+      let cMain, cSub, cBand;  
+      if (type === 'copper') { cMain = '#d2691e'; cSub = '#8b4513'; cBand = '#a0522d'; }  
+      else if (type === 'silver') { cMain = '#e0e0e0'; cSub = '#9e9e9e'; cBand = '#bdbdbd'; }  
+      else if (type === 'gold') { cMain = '#ffd700'; cSub = '#b8860b'; cBand = '#daa520'; }  
+      else { cMain = '#e0ffff'; cSub = '#00ced1'; cBand = '#40e0d0'; }   
+  
+      let w = 24, h = 20;  
+  
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';  
+      ctx.fillRect(-w/2 + 2, -h + 2, w, h);  
+  
+      ctx.fillStyle = cSub;  
+      ctx.fillRect(-w/2, -h, w, h);  
+      ctx.fillStyle = cMain;  
+      ctx.fillRect(-w/2+2, -h+2, w-4, h-4);  
+  
+      ctx.fillStyle = cBand;  
+      ctx.fillRect(-w/2, -h/2 - 2, w, 4);  
+      ctx.fillRect(-4, -h, 8, h);  
+  
+      ctx.fillStyle = '#333';  
+      ctx.fillRect(-2, -h/2 - 2, 4, 6);  
+  
+      if (type === 'diamond') {  
+          ctx.fillStyle = '#fff';  
+          ctx.fillRect(-w/2+4, -h+4, 4, 4);  
+          ctx.fillRect(w/2-8, -h+8, 4, 4);  
+          ctx.fillStyle = '#00bfff';  
+          ctx.fillRect(-2, -h+2, 4, 4);  
+      }  
+      ctx.restore();  
+  }  
+  
+  function getChunkIndexByY(y) {  
+    let altMeters = Math.max(0, Math.floor((height - 100 - y) / PIXELS_PER_METER));  
+    return Math.floor(altMeters / CHUNK_METERS);  
+  }  
+  
+  function addPlatformToChunk(p) {  
+    let idx = getChunkIndexByY(p.y);  
+    if (!chunks[idx]) {  
+      chunks[idx] = [];  
+    }  
+    chunks[idx].push(p);  
+  }  
+  
+  window.addEventListener('resize', () => {  
+    width = window.innerWidth;  
+    height = window.innerHeight;  
+    canvas.width = width;  
+    canvas.height = height;  
+  });  
+  
+  function showSystemMessage(msg) {  
+      systemMessage = msg;  
+      systemMessageEndTime = Date.now() + 2500;  
+  }  
+  
+  function setupSigns() {  
+    initialSigns = [  
+      { x: width * 0.15 - 20, y: height - 40, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },  
+      { x: width * 0.38 - 20, y: height - 40, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },  
+      { x: width * 0.62 + 20, y: height - 40, message: "💫 【キャリブレーション】\n空中にいない時に1秒間に3回連続タップで\n姿勢を基準にジャイロをリセットします。" },  
+      { x: width * 0.85 + 20, y: height - 40, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！" }  
+    ];  
+  }  
+  
+  function getPlatformWidthMult(isTutorial) {  
+      let sizeRand = Math.random();  
+      let mult;  
+      if (isTutorial && !IS_TEST_MODE) {  
+          if (sizeRand < 0.80) { mult = 2.1 + Math.random() * 2.9; }   
+          else { mult = 5.1 + Math.random() * 0.9; }  
+      } else {  
+          if (sizeRand < 0.05) { mult = 1.0; }   
+          else if (sizeRand < 0.30) { mult = 1.1 + Math.random() * 0.9; }   
+          else if (sizeRand < 0.95) { mult = 2.1 + Math.random() * 2.9; }   
+          else { mult = 5.1 + Math.random() * 0.9; }  
+      }  
+      return Math.round(mult * 10) / 10;  
+  }  
+  
+  function generateSlopeParts(totalW, isTutorial) {  
+      if (!IS_TEST_MODE) {  
+          if (isTutorial || totalW < 96 || Math.random() >= 0.30) {  
+              return [{ wMult: 1.0, slope: 0 }];  
+          }  
+      }  
+      let deg = (Math.floor(Math.random() * 4) + 1) * 3;   
+      let sign = Math.random() < 0.5 ? 1 : -1;  
+      let type = Math.floor(Math.random() * 4);  
+        
+      switch(type) {  
+          case 0: return [{ wMult: 1.0, slope: sign * deg }];  
+          case 1: return [{ wMult: 0.5, slope: sign * deg }, { wMult: 0.5, slope: 0 }];  
+          case 2: return [{ wMult: 0.5, slope: 0 }, { wMult: 0.5, slope: sign * deg }];  
+          case 3: return [{ wMult: 0.5, slope: -sign * deg }, { wMult: 0.5, slope: sign * deg }];  
+          default: return [{ wMult: 1.0, slope: sign * deg }];  
+      }  
+  }  
+  
+  function spawnNextPlatform(prevLogicalPlatform) {  
+    let isTutorial = (nextSafetyLevel === 1);   
+  
+    let prevLeftTop = prevLogicalPlatform.leftTop;  
+    let prevRightTop = prevLogicalPlatform.rightTop;  
+    let prevCenter = (prevLeftTop.x + prevRightTop.x) / 2;  
+    let autoDir = Math.random() < (prevCenter / width) ? -1 : 1;  
+    let baseX = autoDir === 1 ? prevRightTop.x : prevLeftTop.x;  
+    let baseY = autoDir === 1 ? prevRightTop.y : prevLeftTop.y;  
+  
+    let gapY;  
+    if (prevLogicalPlatform.isGround) {  
+      gapY = 100 + Math.random() * 40;   
+    } else if (Math.random() < 0.05 && !IS_TEST_MODE) {  
+      gapY = 100;   
+    } else {  
+      gapY = IS_TEST_MODE ? (60 + Math.random() * 40) : (60 + Math.random() * 90);   
+    }  
+      
+    let y = baseY - gapY;  
+    let baseSafetyY = (height - 100) - (nextSafetyLevel * CHUNK_HEIGHT_PX);  
+    let triggerSafetyY = baseSafetyY + (5 * PIXELS_PER_METER);   
+  
+    if (!IS_TEST_MODE && y <= triggerSafetyY) {  
+      let patterns = [ [11], [5, 6], [4, 7], [6, 5], [4, 3, 4], [3, 5, 3], [3, 2, 3, 3] ];  
+      let pattern = patterns[Math.floor(Math.random() * patterns.length)];  
+        
+      let wTotalMass = player.size * 11;   
+      let holeWidth = 32;   
+      let holeStart = prevCenter - holeWidth / 2;  
+      let holeEnd = prevCenter + holeWidth / 2;  
+        
+      let availableSpacing = (LIMIT_RIGHT - LIMIT_LEFT) - wTotalMass - holeWidth;  
+      let spacing = 0;  
+      if (pattern.length > 1) {  
+          spacing = Math.max(32, availableSpacing / (pattern.length - 1));  
+      }  
+      let totalPhysicalWidth = wTotalMass + spacing * (pattern.length - 1) + holeWidth;  
+        
+      let startX = prevCenter - totalPhysicalWidth / 2;  
+      if (startX < LIMIT_LEFT) startX = LIMIT_LEFT;  
+      if (startX + totalPhysicalWidth > LIMIT_RIGHT) startX = LIMIT_RIGHT - totalPhysicalWidth;  
+        
+      nextSafetyLevel++;   
+        
+      let currentX = startX;  
+      let aabbMinX = Infinity, aabbMaxX = -Infinity, aabbMinY = Infinity, aabbMaxY = -Infinity;  
+        
+      let pObjs = [];  
+      for(let i = 0; i < pattern.length; i++) {  
+        let remainingW = player.size * pattern[i];  
+          
+        while (remainingW > 0.01) {  
+            if (currentX >= holeStart - 0.01 && currentX < holeEnd - 0.01) { currentX = holeEnd; }  
+            let drawW = remainingW;  
+            if (currentX < holeStart && currentX + drawW > holeStart) { drawW = holeStart - currentX; }  
+              
+            let p = { x: currentX, y: y, w: drawW, h: 20, isSafety: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false };  
+            pObjs.push(p);  
+            addPlatformToChunk(p);  
+              
+            aabbMinX = Math.min(aabbMinX, p.x);  
+            aabbMaxX = Math.max(aabbMaxX, p.x + p.w);  
+            aabbMinY = Math.min(aabbMinY, p.y);  
+            aabbMaxY = Math.max(aabbMaxY, p.y + p.h);  
+              
+            currentX += drawW;  
+            remainingW -= drawW;  
+            if (currentX >= holeStart - 0.01 && currentX < holeEnd - 0.01) { currentX = holeEnd; }  
+        }  
+          
+        if (i < pattern.length - 1) {  
+            let remainingS = spacing;  
+            while (remainingS > 0.01) {  
+                if (currentX >= holeStart - 0.01 && currentX < holeEnd - 0.01) { currentX = holeEnd; }  
+                let sW = remainingS;  
+                if (currentX < holeStart && currentX + sW > holeStart) { sW = holeStart - currentX; }  
+                currentX += sW;  
+                remainingS -= sW;  
+                if (currentX >= holeStart - 0.01 && currentX < holeEnd - 0.01) { currentX = holeEnd; }  
+            }  
+        }  
+      }  
+      return {   
+          aabb: { minX: aabbMinX, maxX: aabbMaxX, minY: aabbMinY, maxY: aabbMaxY },   
+          leftTop: {x: pObjs[0].x, y: pObjs[0].y},  
+          rightTop: {x: pObjs[pObjs.length-1].x + pObjs[pObjs.length-1].w, y: pObjs[pObjs.length-1].y},  
+          isSafety: true   
+      };  
+    }  
+      
+    let pMult = getPlatformWidthMult(isTutorial);  
+    let pw = player.size * pMult;  
+  
+    let safeMinReach = (pw / 2) + 10;  
+    let safeMaxReach = safeMinReach + (isTutorial && !IS_TEST_MODE ? 50 : 70);   
+    let currentReach = safeMinReach + Math.random() * (safeMaxReach - safeMinReach);  
+  
+    let center = baseX + currentReach * autoDir;  
+      
+    if (autoDir === -1 && center - pw / 2 < LIMIT_LEFT) {  
+        let tryRight = baseX + currentReach * 1;  
+        if (tryRight + pw / 2 <= LIMIT_RIGHT) { center = tryRight; autoDir = 1; }  
+    } else if (autoDir === 1 && center + pw / 2 > LIMIT_RIGHT) {  
+        let tryLeft = baseX + currentReach * -1;  
+        if (tryLeft - pw / 2 >= LIMIT_LEFT) { center = tryLeft; autoDir = -1; }  
+    }  
+  
+    let px = center - pw / 2;  
+      
+    let leftGap = px - LIMIT_LEFT;  
+    if (leftGap > 0 && leftGap < 27) px = LIMIT_LEFT;  
+      
+    let rightGap = LIMIT_RIGHT - (px + pw);  
+    if (rightGap > 0 && rightGap < 27) px = LIMIT_RIGHT - pw;  
+  
+    let parts = generateSlopeParts(pw, isTutorial);  
+    let currentPx = px;  
+    let currentPy = y;  
+    let aabbMinX = Infinity, aabbMaxX = -Infinity, aabbMinY = Infinity, aabbMaxY = -Infinity;  
+      
+    let pObjs = [];  
+    for (let part of parts) {  
+        let partW = pw * part.wMult;  
+        let slopeTan = Math.tan(part.slope * Math.PI / 180);  
+        let partLeft = currentPx;  
+        let partRight = currentPx + partW;  
+          
+        if (partLeft < LIMIT_RIGHT && partRight > LIMIT_LEFT) {  
+            let drawLeft = Math.max(LIMIT_LEFT, partLeft);  
+            let drawRight = Math.min(LIMIT_RIGHT, partRight);  
+            let drawW = drawRight - drawLeft;  
+            let drawY = currentPy + (drawLeft - partLeft) * slopeTan;  
+              
+            if (drawW > 0) {  
+                let pObj = { x: drawLeft, y: drawY, w: drawW, h: 20, isSafety: false, friction: 85, slope: part.slope };  
+                  
+                if (drawW >= 32 && !isTutorial) {  
+                    if (Math.random() < 0.08) {  
+                        let altMeters = Math.max(0, Math.floor((height - 100 - drawY) / PIXELS_PER_METER));  
+                        pObj.chest = { type: getChestType(altMeters), x: drawLeft + drawW / 2, opened: false };  
+                    }  
+                }  
+                  
+                pObjs.push(pObj);  
+                  
+                aabbMinX = Math.min(aabbMinX, drawLeft);  
+                aabbMaxX = Math.max(aabbMaxX, drawRight);  
+                aabbMinY = Math.min(aabbMinY, drawY, drawY + drawW * slopeTan);  
+                aabbMaxY = Math.max(aabbMaxY, drawY + 20, drawY + drawW * slopeTan + 20);  
+            }  
+        }  
+        currentPx += partW;  
+        currentPy += partW * slopeTan;  
+    }  
+  
+    if (pObjs.length === 0) {  
+        let fallbackW = player.size * 2.0;  
+        let fallbackX = Math.max(LIMIT_LEFT, Math.min(LIMIT_RIGHT - fallbackW, prevCenter - fallbackW / 2));  
+        let pObj = { x: fallbackX, y: y, w: fallbackW, h: 20, isSafety: false, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false };  
+        addPlatformToChunk(pObj);  
+        return {   
+            aabb: { minX: pObj.x, maxX: pObj.x + pObj.w, minY: pObj.y, maxY: pObj.y + pObj.h },   
+            leftTop: {x: pObj.x, y: pObj.y},  
+            rightTop: {x: pObj.x + pObj.w, y: pObj.y},  
+            isSafety: false   
+        };   
+    }  
+    
+    // 足場の接続判定と角度情報の付与
+    for (let i = 0; i < pObjs.length; i++) {  
+        pObjs[i].isLeftConnected = (i > 0);  
+        pObjs[i].isRightConnected = (i < pObjs.length - 1);  
+        pObjs[i].leftSlope = pObjs[i].isLeftConnected ? pObjs[i - 1].slope : 0;
+        pObjs[i].rightSlope = pObjs[i].isRightConnected ? pObjs[i + 1].slope : 0;
+        addPlatformToChunk(pObjs[i]);  
+    }  
+  
+    let fP = pObjs[0];  
+    let lP = pObjs[pObjs.length - 1];  
+    return {   
+        aabb: { minX: aabbMinX, maxX: aabbMaxX, minY: aabbMinY, maxY: aabbMaxY },   
+        leftTop: {x: fP.x, y: fP.y},  
+        rightTop: {x: lP.x + lP.w, y: lP.y + lP.w * Math.tan((lP.slope||0)*Math.PI/180)},  
+        isSafety: false   
+    };   
+  }  
+  
+  function createInitialPlatforms() {  
+    chunks = {};  
+    let ground = { x: LIMIT_LEFT, y: height - 40, w: LIMIT_RIGHT - LIMIT_LEFT, h: 40, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false };  
+    addPlatformToChunk(ground);  
+  
+    generatedHighestPlatform = {   
+        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: height - 40, maxY: height },   
+        leftTop: {x: LIMIT_LEFT, y: height - 40},  
+        rightTop: {x: LIMIT_RIGHT, y: height - 40},  
+        isSafety: true,   
+        isGround: true   
+    };  
+    while (generatedHighestPlatform.aabb.minY > -height) {  
+      generatedHighestPlatform = spawnNextPlatform(generatedHighestPlatform);  
+    }  
+  }  
+  
+  function getActivePlatforms(currentChunkIndex) {  
+    let active = [];  
+    for (let offset = -1; offset <= 1; offset++) {  
+      let targetIndex = currentChunkIndex + offset;  
+        
+      let chunkTopY = (height - 100) - (targetIndex + 1) * CHUNK_HEIGHT_PX;  
+      active.push({ x: LIMIT_LEFT - 96, y: chunkTopY, w: 96, h: CHUNK_HEIGHT_PX, isSafety: true, friction: 0, slope: 0, invisibleWall: true });  
+      active.push({ x: LIMIT_RIGHT, y: chunkTopY, w: 96, h: CHUNK_HEIGHT_PX, isSafety: true, friction: 0, slope: 0, invisibleWall: true });  
+  
+      if (targetIndex >= 0 && chunks[targetIndex]) {  
+        active = active.concat(chunks[targetIndex]);  
+      }  
+    }  
+    return active;  
+  }  
+  
+  function startAction() {  
+    initAudio();  
+    if (!isPlaying || isPaused) return;  
+    if (player.isClimbing) return;  
+      
+    const now = Date.now();  
+      
+    if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {  
+        player.isClimbing = true;  
+        player.climbStartTime = now;  
+          
+        let cDur = 500;  
+        if (player.wallHitType === 1) cDur = 300;  
+        else if (player.wallHitType === 2) cDur = 700;  
+          
+        player.climbDuration = cDur;  
+        player.climbEndTime = now + cDur;   
+          
+        player.climbStartY = player.y;   
+        player.climbStartX = player.x;   
+          
+        let tan = player.wallHitPlatform.slope ? Math.tan(player.wallHitPlatform.slope * Math.PI / 180) : 0;  
+        let climbEndX = (player.wallHitDir === 1)   
+            ? player.wallHitPlatform.x + player.size * 0.5   
+            : player.wallHitPlatform.x + player.wallHitPlatform.w - player.size * 0.5;  
+        let climbEndY = player.wallHitPlatform.y + (climbEndX - player.wallHitPlatform.x) * tan - (player.size * 0.95 / 2);  
+          
+        player.climbTargetY = climbEndY;  
+        player.climbTargetX = climbEndX;  
+          
+        hitStopEndTime = 0;   
+        player.vy = 0;  
+        player.airVx = 0;  
+        player.vx = 0;   
+          
+        playSeClimb();  
+    }  
+  }  
+  
+  function endAction() {  
+    if (!isPlaying || isPaused) return;  
+    isPointerDown = false;  
+    lastReleaseTime = Date.now();   
+  
+    if (isPressing) {  
+      isPressing = false;  
+      if ((player.onGround || player.isClimbing) && hitStopEndTime <= Date.now()) {  
+        const pressDuration = Date.now() - pressStartTime;  
+        const maxTicks = 20;   
+        let ticks = Math.floor(pressDuration / 100);  
+        if (ticks < 1) ticks = 1;  
+        if (ticks > maxTicks) ticks = maxTicks;  
+  
+        const jumpRatio = ticks / maxTicks;  
+        player.vy = player.maxJumpPower * Math.sqrt(jumpRatio);  
+        player.airVx = player.vx;  
+          
+        player.onGround = false;  
+        player.isClimbing = false;  
+        player.currentPlatform = null;  
+        player.highestYInAir = player.y;   
+          
+        player.jumpStartX = player.x;  
+        player.jumpStartY = player.y;  
+        player.lastJumpChargeTime = pressDuration;  
+        player.isBigFalling = false;  
+          
+        playSeJump();  
+      } else {  
+        pressStartTime = 0;  
+        player.lastJumpChargeTime = 0;  
+      }  
+    }  
+  }  
+  
+  window.addEventListener('touchstart', (e) => {  
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#pauseBtn') || e.target.closest('#pauseMenu') || e.target.closest('#lockScreen')) return;  
+      isPointerDown = true;  
+        
+      const now = Date.now();  
+      const inAirNow = !player.onGround && !player.isClimbing;  
+        
+      tapTimes.push(now);  
+      tapTimes = tapTimes.filter(t => now - t <= 1000);   
+        
+      if (tapTimes.length >= 3) {  
+          if (!inAirNow) {  
+              let q = eulerToQuat(currentAlpha, currentBeta, currentGamma);  
+              baseQuat = q;  
+              showSystemMessage("ジャイロ基準位置をリセットしました");  
+          }  
+          tapTimes = [];   
+          return;   
+      }  
+        
+      if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {  
+          startAction();  
+      }  
+  }, {passive: false});  
+  
+  window.addEventListener('touchend', (e) => {  
+      endAction();  
+  });  
+  
+  function handleOrientation(event) {  
+      if (!isPlaying || isPaused) return;  
+        
+      let alpha = event.alpha || 0;  
+      let beta = event.beta || 0;  
+      let gamma = event.gamma || 0;  
+        
+      currentAlpha = alpha;  
+      currentBeta = beta;  
+      currentGamma = gamma;  
+        
+      let q = eulerToQuat(alpha, beta, gamma);  
+        
+      if (needsInitialCalibration) {  
+          baseQuat = q;  
+          needsInitialCalibration = false;  
+      }  
+        
+      let q_inv = invertQuat(baseQuat);  
+      let q_rel = multiplyQuat(q_inv, q);  
+      let relAngles = getRelEuler(q_rel);  
+        
+      let g = relAngles.gamma;  
+      if (g > 45) g = 45;  
+      if (g < -45) g = -45;  
+      tilt = g;  
+  }  
+  
+  const stopProp = (e) => e.stopPropagation();  
+  pauseBtn.addEventListener('mousedown', stopProp);  
+  pauseBtn.addEventListener('touchstart', stopProp, {passive: false});  
+  pauseMenu.addEventListener('mousedown', stopProp);  
+  pauseMenu.addEventListener('touchstart', stopProp, {passive: false});  
+  
+  function pauseGame() {  
+      if (!isPlaying || isPaused) return;  
+      isPaused = true;  
+      pauseTimeStart = Date.now();  
+      pauseMenu.style.display = 'flex';  
+      pauseMain.style.display = 'block';  
+      pauseConfirm.style.display = 'none';  
+      pauseSettings.style.display = 'none';  
+  }  
+  
+  pauseBtn.addEventListener('click', (e) => {  
+    e.stopPropagation();  
+    pauseGame();  
+  });  
+  
+  resumeBtn.addEventListener('click', (e) => {  
+    let pauseDuration = Date.now() - pauseTimeStart;  
+      
+    hitStopEndTime += pauseDuration;  
+    player.climbStartTime += pauseDuration;  
+    player.climbEndTime += pauseDuration;  
+    player.confusionEndTime += pauseDuration;  
+    player.hitStopCooldownEndTime += pauseDuration;  
+    player.bigFallPenaltyEndTime += pauseDuration;  
+    bigFallStartTime += pauseDuration;  
+    systemMessageEndTime += pauseDuration;  
+  
+    lastReleaseTime = Date.now();   
+    isPointerDown = false;  
+    isPressing = false;  
+  
+    isPaused = false;  
+    pauseMenu.style.display = 'none';  
+  });  
+  
+  settingsBtn.addEventListener('click', () => {  
+    pauseMain.style.display = 'none';  
+    pauseSettings.style.display = 'block';  
+  });  
+  closeSettingsBtn.addEventListener('click', () => {  
+    pauseSettings.style.display = 'none';  
+    pauseMain.style.display = 'block';  
+  });  
+  bgmSlider.addEventListener('input', (e) => {  
+      let val = e.target.value;  
+      bgmValDisp.innerText = val;  
+      bgmVolume = val / 100;  
+      if (currentBgm) currentBgm.volume = bgmVolume;  
+  });  
+  seSlider.addEventListener('input', (e) => {  
+      let val = e.target.value;  
+      seValDisp.innerText = val;  
+      seVolume = val / 100;  
+  });  
+  
+  toTitleBtn.addEventListener('click', () => {  
+    pauseMain.style.display = 'none';  
+    pauseConfirm.style.display = 'block';  
+  });  
+  confirmNoBtn.addEventListener('click', () => {  
+    pauseConfirm.style.display = 'none';  
+    pauseMain.style.display = 'block';  
+  });  
+  
+  confirmYesBtn.addEventListener('click', () => {  
+    fadeOverlay.style.opacity = 1;  
+    fadeOutBgm(1000);  
+    timerRunning = false;  
+    elapsedMs = 0;  
+      
+    setTimeout(() => {  
+        isPaused = false;  
+        isPlaying = false;  
+        pauseMenu.style.display = 'none';  
+        uiLayer.style.display = 'none';  
+        startScreen.style.display = 'flex';  
+        ctx.clearRect(0, 0, width, height);   
+          
+        fadeInBgm(bgmTitle, 1000);  
+        fadeOverlay.style.opacity = 0;  
+    }, 1000);  
+  });  
+  
+  startBtn.addEventListener('click', async () => {  
+    initAudio();  
+    needsInitialCalibration = true;   
+      
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {  
+      try {  
+        const permissionState = await DeviceOrientationEvent.requestPermission();  
+        if (permissionState === 'granted') {  
+          window.addEventListener('deviceorientation', handleOrientation);  
+        } else {  
+          alert('ジャイロセンサーを許可してください。');  
+          return;  
+        }  
+      } catch (e) {  
+        console.error(e);  
+      }  
+    } else {  
+      window.addEventListener('deviceorientation', handleOrientation);  
+    }  
+      
+    playSeFall();  
+    fadeOverlay.style.opacity = 1;  
+    fadeOutBgm(1000);  
+      
+    setTimeout(() => {  
+        startGameInit();  
+        fadeInBgm(bgmGame, 1000);  
+        fadeOverlay.style.opacity = 0;  
+          
+        setTimeout(() => {  
+            timerRunning = true;  
+            lastFrameTime = Date.now();  
+        }, 1000);  
+    }, 1000);  
+  });  
+  
+  function startGameInit() {  
+    startScreen.style.display = 'none';  
+    uiLayer.style.display = 'block';  
+      
+    if (IS_TEST_MODE) {  
+        testModeUI.style.display = 'block';  
+    } else {  
+        testModeUI.style.display = 'none';  
+    }  
+  
+    isPlaying = true;  
+    isPaused = false;  
+    isPressing = false;  
+    isPointerDown = false;  
+    lastReleaseTime = Date.now();  
+    tilt = 0;  
+    maxAltitude = 0;  
+    bestScore = 0;   
+    nextSafetyLevel = 1;  
+      
+    player.x = width / 2;  
+    player.y = height - 49.5;   
+      
+    cameraY = player.y - height * 0.6;  
+    if (cameraY > 0) cameraY = 0;  
+    cameraX = 0;   
+  
+    player.vx = 0;  
+    player.vy = 0;  
+    player.airVx = 0;  
+    player.isClimbing = false;  
+    player.wallHitDir = 0;  
+    player.wallHitType = 3;  
+    player.highestYInAir = player.y;  
+    player.onGround = true;   
+    player.currentPlatform = null;  
+      
+    player.jumpStartX = player.x;  
+    player.jumpStartY = player.y;  
+    player.lastJumpChargeTime = 0;  
+    player.isBigFalling = false;  
+    player.hasPlayedFallSound = false;   
+    player.lastMoveSoundTime = 0;   
+      
+    hitStopEndTime = 0;  
+    player.confusionEndTime = 0;  
+    player.hitStopCooldownEndTime = 0;  
+    player.bigFallPenaltyEndTime = 0;   
+    bigFallStartTime = 0;   
+      
+    baseQuat = [1, 0, 0, 0];  
+    tapTimes = [];  
+    systemMessage = "";  
+    lastChargeSoundTime = 0;  
+      
+    sessionFlags = { story: false, extra: false, final: false };  
+      
+    elapsedMs = 0;  
+    document.getElementById('timeDisp').innerText = "00:00:00.00";  
+    maxAltElement.innerText = "0";  
+      
+    setupSigns();   
+    createInitialPlatforms();  
+    initClouds();  
+  
+    requestAnimationFrame(update);  
+  }  
+  
+  function update() {  
+    if (!isPlaying) return;  
+      
+    const now = Date.now();  
+      
+    if (isPaused) {  
+      requestAnimationFrame(update);  
+      return;  
+    }  
+  
+    if (timerRunning && !isPaused) {  
+        elapsedMs += (now - lastFrameTime);  
+          
+        let totalCenti = Math.floor(elapsedMs / 10);  
+        let c = totalCenti % 100;  
+        let totalSec = Math.floor(totalCenti / 100);  
+        let s = totalSec % 60;  
+        let m = Math.floor(totalSec / 60) % 60;  
+        let h = Math.floor(totalSec / 3600);  
+          
+        if (h > 99) { h = 99; m = 99; s = 99; c = 99; }  
+          
+        let pad = (num) => num.toString().padStart(2, '0');  
+        timeDisp.innerText = `${pad(h)}:${pad(m)}:${pad(s)}.${pad(c)}`;  
+    }  
+    lastFrameTime = now;  
+  
+    coinDisp.innerText = totalCoins;  
+  
+    ctx.clearRect(0, 0, width, height);  
+  
+    let currentChunkIndex = getChunkIndexByY(player.y);  
+    let activePlatforms = getActivePlatforms(currentChunkIndex);  
+  
+    let activeMessage = null;  
+    let currentOpacity = 0;  
+    let useCSSFade = true;  
+  
+    let bigFallElapsed = now - bigFallStartTime;  
+    if (bigFallElapsed < 4500) {  
+        activeMessage = currentBigFallMessage;  
+        useCSSFade = false;   
+        messageBanner.style.transition = 'none';  
+          
+        if (bigFallElapsed < 1500) {  
+            currentOpacity = bigFallElapsed / 1500;  
+        } else if (bigFallElapsed < 3000) {  
+            currentOpacity = 1;  
+        } else {  
+            currentOpacity = 1 - ((bigFallElapsed - 3000) / 1500);  
+        }  
+    } else if (now < systemMessageEndTime) {  
+        activeMessage = systemMessage;  
+        currentOpacity = 1;  
+        useCSSFade = true;  
+    } else {  
+        if (player.y > height - 200) {   
+            for (let sign of initialSigns) {  
+                if (Math.abs(player.x - sign.x) < 25 && Math.abs(player.y - sign.y) < 50) {  
+                    activeMessage = sign.message;  
+                    break;  
+                }  
+            }  
+        }  
+        if (activeMessage) {  
+            currentOpacity = 1;  
+            useCSSFade = true;  
+        }  
+    }  
+  
+    if (activeMessage) {  
+        let htmlStr = activeMessage.replace(/\n/g, '<br>');  
+        if (messageBanner.innerHTML !== htmlStr) {  
+            messageBanner.innerHTML = htmlStr;  
+        }  
+    }  
+      
+    if (useCSSFade) {  
+        messageBanner.style.transition = 'opacity 0.2s ease-in-out';  
+        messageBanner.style.opacity = activeMessage ? '1' : '0';  
+    } else {  
+        messageBanner.style.opacity = currentOpacity;  
+    }  
+  
+    let isBigFallConfused = player.bigFallPenaltyEndTime > now;  
+    let isNormalConfused = player.confusionEndTime > now;  
+  
+    if (isPointerDown && !isPressing) {  
+       if (!isNormalConfused && !isBigFallConfused && now - lastReleaseTime >= 300) {  
+           isPressing = true;  
+           pressStartTime = now;  
+           lastChargeSoundTime = now;   
+       }  
+    }  
+  
+    if (isPressing && hitStopEndTime <= now) {  
+        if (now - lastChargeSoundTime >= 400) {  
+            playSeCharge();  
+            lastChargeSoundTime = now;  
+        }  
+    }  
+  
+    if (player.isClimbing) {  
+      let elapsed = now - player.climbStartTime;  
+      let ratio = elapsed / player.climbDuration;  
+        
+      if (ratio < 0.6) {  
+        let yRatio = ratio / 0.6;  
+        player.y = player.climbStartY + (player.climbTargetY - player.climbStartY) * yRatio;  
+        player.x = player.climbStartX;  
+      } else {  
+        let xRatio = (ratio - 0.6) / 0.4;  
+        player.y = player.climbTargetY;  
+        player.x = player.climbStartX + (player.climbTargetX - player.climbStartX) * xRatio;  
+      }  
+        
+      if (ratio >= 1) {  
+        player.x = player.climbTargetX;  
+        player.y = player.climbTargetY;  
+        player.isClimbing = false;  
+        player.onGround = true;  
+        player.highestYInAir = player.y;   
+        player.wallHitPlatform = null;  
+        player.wallHitDir = 0;  
+        player.vx = 0;   
+        player.hasPlayedFallSound = false;   
+      }  
+    } else if (hitStopEndTime > now) {  
+      player.vx = 0;   
+    } else {  
+      if (player.wallHitPlatform !== null) {  
+        player.wallHitPlatform = null;  
+        player.wallHitDir = 0;  
+      }  
+  
+      if (isNormalConfused || isBigFallConfused) {  
+          isPressing = false;   
+      }  
+  
+      let effectiveTilt = tilt;  
+      let slipTilt = 0;  
+  
+      if (player.onGround && player.currentPlatform && player.currentPlatform.slope) {  
+          slipTilt = Math.sin(player.currentPlatform.slope * Math.PI / 180) * 60;  
+      }  
+  
+      let inTutorial = player.y > (height - 100) - CHUNK_HEIGHT_PX;  
+      let tiltMult = (inTutorial && !IS_TEST_MODE) ? 0.8 : 1.0;  
+        
+      let activeTilt = effectiveTilt * tiltMult;  
+        
+      if (isBigFallConfused) {  
+          activeTilt = -effectiveTilt * 0.85;   
+      } else if (isNormalConfused) {  
+          let confMult = (inTutorial && !IS_TEST_MODE) ? 1.1 : 1.3;  
+          activeTilt = -effectiveTilt * confMult;  
+      }  
+  
+      activeTilt += slipTilt;  
+        
+      let preX = player.x;  
+  
+      if (player.onGround) {  
+          let friction = 85;   
+          if (player.currentPlatform && player.currentPlatform.friction !== undefined) {  
+              friction = player.currentPlatform.friction;  
+          }  
+          let normFriction = friction / 100;   
+          let targetVx = activeTilt * player.speed;  
+          let accel = 0.02 + (normFriction * 0.28);   
+            
+          player.vx += (targetVx - player.vx) * accel;  
+          player.x += player.vx;  
+            
+          if (player.currentPlatform && !player.currentPlatform.invisibleWall) {  
+              let p = player.currentPlatform;  
+              if (player.x < p.x - 12 || player.x > p.x + p.w + 12) {  
+                  player.onGround = false;  
+                  player.currentPlatform = null;  
+                  player.airVx = player.vx;  
+                  player.jumpStartX = player.x;  
+                  player.jumpStartY = player.y;  
+              }  
+          }  
+            
+      } else {  
+          player.x += player.airVx + (activeTilt * player.airControl);  
+          player.vx = player.airVx;   
+      }  
+  
+      player.vy += player.gravity;  
+      if (player.vy > 24) player.vy = 24;  
+      player.y += player.vy;  
+  
+      let wasOnGround = player.onGround;  
+      player.onGround = false;  
+  
+      let shapeTop, shapeBottom, shapeLeft, shapeRight;  
+      let isAirTeardrop = !wasOnGround && hitStopEndTime <= now;  
+      let rMax = player.size * 0.95 / 2;  
+  
+      if (isAirTeardrop) {  
+          let speed = Math.hypot(player.vx, player.vy);  
+          let angle = Math.atan2(player.vy, player.vx);  
+          let stretch = Math.min(speed / 15, 1.0);  
+            
+          let rFront = (player.size / 2) - 3;  
+          let rBack = (player.size / 2) - 5;  
+          let cxFront = player.x + Math.cos(angle) * (player.size * 0.5 * stretch * 0.4);  
+          let cyFront = player.y + Math.sin(angle) * (player.size * 0.5 * stretch * 0.4);  
+          let cxBack = player.x - Math.cos(angle) * (player.size * 0.5 * stretch * 0.2);  
+          let cyBack = player.y - Math.sin(angle) * (player.size * 0.5 * stretch * 0.2);  
+  
+          shapeBottom = Math.max(cyFront + rFront, cyBack + rBack);  
+          shapeTop = Math.min(cyFront - rFront, cyBack - rBack);  
+          shapeLeft = Math.min(cxFront - rFront, cxBack - rBack);  
+          shapeRight = Math.max(cxFront + rFront, cxBack + rBack);  
+      } else {  
+          shapeBottom = player.y + rMax;  
+          shapeTop = player.y - rMax;  
+          shapeLeft = player.x - rMax;  
+          shapeRight = player.x + rMax;  
+      }  
+  
+      if (isAirTeardrop) {  
+          if (player.y - player.highestYInAir >= 320 && !player.hasPlayedFallSound && player.vy > 0) {  
+              player.hasPlayedFallSound = true;  
+              playSeFall();  
+          }  
+          if (player.y - player.highestYInAir >= 400 && !player.isBigFalling && player.vy > 0) {  
+              player.isBigFalling = true;  
+          }  
+      }  
+  
+      if (!player.onGround) {  
+          player.highestYInAir = Math.min(player.highestYInAir, player.y);  
+      }  
+  
+      let leftWall = LIMIT_LEFT;  
+      let rightWall = LIMIT_RIGHT;  
+  
+      if (shapeLeft < leftWall) {  
+        player.x = leftWall + (player.x - shapeLeft);  
+        player.airVx = 0;   
+        player.vx = 0;  
+      }  
+      if (shapeRight > rightWall) {  
+        player.x = rightWall - (shapeRight - player.x);  
+        player.airVx = 0;  
+        player.vx = 0;  
+      }  
+  
+      let checkBottom = wasOnGround ? shapeBottom + 12 : shapeBottom;  
+      const distFromStart = Math.hypot(player.x - player.jumpStartX, player.y - player.jumpStartY);  
+  
+      for (let p of activePlatforms) {  
+          if (p.invisibleWall) continue;  
+          if (p.chest && !p.chest.opened) {  
+              let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;  
+              let cY = p.y + (p.chest.x - p.x) * tan;  
+              let cW = 24, cH = 20;  
+              let cMinX = p.chest.x - cW/2;  
+              let cMaxX = p.chest.x + cW/2;  
+              let cMinY = cY - cH;  
+              let cMaxY = cY;  
+  
+              if (shapeRight > cMinX && shapeLeft < cMaxX && shapeBottom > cMinY && shapeTop < cMaxY) {  
+                  p.chest.opened = true;  
+                  let res = openChest(p.chest.type);  
+                  playSeChestOpen(p.chest.type);  
+                  if (res.skin) {  
+                      let sName = res.skin === 'limited' ? '限定スキン' : '通常スキン';  
+                      addFloatingText(p.chest.x, cMinY, sName + " GET!", "#ff00ff");  
+                  } else {  
+                      totalCoins += res.coins;  
+                      addFloatingText(p.chest.x, cMinY, "+" + res.coins, "#ffff00");  
+                      saveData();  
+                  }  
+              }  
+          }  
+      }  
+  
+      for (let p of activePlatforms) {  
+        if (p.invisibleWall) continue;   
+  
+        let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;  
+          
+        if (shapeRight > p.x && shapeLeft < p.x + p.w) {  
+            
+          let checkX = player.x;  
+          if (checkX > p.x + p.w) {  
+              if (p.isRightConnected) continue;   
+              checkX = p.x + p.w;  
+          } else if (checkX < p.x) {  
+              if (p.isLeftConnected) continue;  
+              checkX = p.x;  
+          }  
+            
+          let surfaceY = p.y + (checkX - p.x) * tan;  
+          let bottomY = Math.max(p.y, p.y + p.w * tan) + p.h;  
+  
+          if (checkBottom > surfaceY && shapeTop < bottomY) {  
+              
+            let oldX = player.x - player.vx;  
+            let oldY = player.y - player.vy;  
+              
+            let oTop, oBottom, oLeft, oRight;  
+            if (isAirTeardrop) {  
+                oTop = shapeTop - player.vy;  
+                oBottom = shapeBottom - player.vy;  
+                oLeft = shapeLeft - player.vx;  
+                oRight = shapeRight - player.vx;  
+            } else {  
+                oTop = oldY - rMax;  
+                oBottom = oldY + rMax;  
+                oLeft = oldX - rMax;  
+                oRight = oldX + rMax;  
+            }  
+  
+            let oldCheckX = oldX;  
+            if (oldCheckX > p.x + p.w) {  
+                oldCheckX = p.isRightConnected ? oldX : p.x + p.w;  
+            } else if (oldCheckX < p.x) {  
+                oldCheckX = p.isLeftConnected ? oldX : p.x;  
+            }  
+            let oldSurfaceY = p.y + (oldCheckX - p.x) * tan;  
+  
+            let hitFromAbove = (oBottom <= oldSurfaceY + 15) || (wasOnGround && player.vy >= -2);  
+            let hitFromBelow = oTop >= bottomY - 12;  
+            let hitFromLeft  = oRight <= p.x + 8;  
+            let hitFromRight = oLeft >= p.x + p.w - 8;  
+  
+            if (hitFromAbove && player.vy >= 0) {  
+              let newY = surfaceY - (shapeBottom - player.y);  
+                
+              if (!wasOnGround) {  
+                  if (player.isBigFalling) {  
+                      playSeCrash();  
+                      hitStopEndTime = now + 300;  
+                      player.hitStopCooldownEndTime = now + 500;  
+                      player.wallHitDir = 2;   
+                      player.vx = 0;   
+                        
+                      player.bigFallPenaltyEndTime = now + 1500;   
+                        
+                      bigFallStartTime = now;  
+                      currentBigFallMessage = bigFallMessages[Math.floor(Math.random() * bigFallMessages.length)];  
+                  } else {  
+                      if (player.vy > 2 || distFromStart >= player.size) {  
+                          playSeHitLight();  
+                      }  
+                  }  
+              }  
+  
+              if (!player.onGround || newY < player.y) {  
+                  player.y = newY;  
+                  player.currentPlatform = p;   
+              }  
+                
+              player.vy = 0;  
+              player.airVx = 0;   
+              player.onGround = true;  
+              player.highestYInAir = player.y;   
+              player.isBigFalling = false;  
+              player.lastJumpChargeTime = 0;   
+              player.hasPlayedFallSound = false;   
+            }   
+            else if (hitFromBelow && player.vy < 0) {  
+              let hitLeftEdge = (shapeRight >= p.x && shapeRight <= p.x + 5);  
+              let hitRightEdge = (shapeLeft >= p.x + p.w - 5 && shapeLeft <= p.x + p.w);  
+                
+              if (hitLeftEdge || hitRightEdge) {  
+                  let wallX = hitLeftEdge ? p.x : p.x + p.w;  
+                  if (hitLeftEdge) {  
+                      player.x = p.x - (shapeRight - player.x) + 5;  
+                  } else {  
+                      player.x = p.x + p.w + (player.x - shapeLeft) - 5;  
+                  }  
+                    
+                  let wallTopY = p.y + (wallX - p.x) * tan;  
+                  player.y = wallTopY;  
+                    
+                  player.vy = 0;  
+                  player.airVx = 0;  
+                  player.vx = 0;  
+                    
+                  if (distFromStart >= player.size) {  
+                      playSeHitLight();  
+                      let stunTime = 150;  
+                      hitStopEndTime = now + stunTime;   
+                      player.hitStopCooldownEndTime = now + stunTime + 200;  
+                      player.wallHitDir = hitLeftEdge ? 1 : -1;   
+                      player.wallHitType = 2;   
+                      player.wallHitPlatform = p;  
+                  }  
+              } else {  
+                  let edgeX = Math.max(p.x, Math.min(p.x + p.w, player.x));  
+                  let edgeY = p.y + (edgeX - p.x) * tan + p.h;  
+                  player.y = edgeY + (player.y - shapeTop);  
+                  player.vy = 0;   
+                    
+                  if (!wasOnGround) {  
+                      if (distFromStart >= player.size) {  
+                          if (player.lastJumpChargeTime >= 1100) {  
+                              playSeHitHeavy();  
+                              player.confusionEndTime = now + 1500;  
+                              if (player.hitStopCooldownEndTime <= now) {  
+                                  hitStopEndTime = now + 300;  
+                                  player.hitStopCooldownEndTime = now + 500;  
+                                  player.wallHitDir = 0;   
+                                  player.wallHitPlatform = p;  
+                              }  
+                          } else {  
+                              playSeHitLight();  
+                              if (player.hitStopCooldownEndTime <= now) {  
+                                  hitStopEndTime = now + 300;  
+                                  player.hitStopCooldownEndTime = now + 500;  
+                                  player.wallHitDir = 0;   
+                                  player.wallHitPlatform = p;  
+                              }  
+                          }  
+                      }  
+                  }  
+              }  
+            }  
+            else if (hitFromLeft || hitFromRight) {  
+              let wallX = hitFromLeft ? p.x : p.x + p.w;  
+              let wTop = p.y + (wallX - p.x) * tan;  
+              let wBot = wTop + p.h;   
+                
+              let cTop = Math.max(shapeTop, wTop);  
+              let cBot = Math.min(shapeBottom, wBot);  
+                
+              let cTopRatio = (wBot - cTop) / p.h * 100;  
+              let cBotRatio = (wBot - cBot) / p.h * 100;  
+                
+              let hType = 3;  
+              if (cBotRatio >= 51) hType = 1;         
+              else if (cTopRatio <= 50) hType = 2;    
+              else hType = 3;                         
+  
+              if (hitFromLeft) player.x = p.x - rMax;  
+              else player.x = (p.x + p.w) + rMax;  
+                
+              player.airVx = 0;  
+              player.vx = 0;  
+                
+              if (!wasOnGround && player.hitStopCooldownEndTime <= now) {  
+                  if (distFromStart >= player.size) {  
+                      playSeHitLight();  
+                        
+                      let stunTime = 300;  
+                      if (hType === 1) stunTime = 500;  
+                      else if (hType === 2) stunTime = 150;  
+                      else if (hType === 3) stunTime = 300;  
+                        
+                      hitStopEndTime = now + stunTime;   
+                      player.hitStopCooldownEndTime = now + stunTime + 200;  
+                      player.wallHitDir = hitFromLeft ? 1 : -1;   
+                      player.wallHitType = hType;  
+                      player.wallHitPlatform = p;  
+                        
+                      player.y = wTop;  
+                  }  
+              }  
+            }  
+          }  
+        }  
+      }  
+  
+      if (wasOnGround && !player.onGround) {  
+          player.airVx = player.vx;  
+          if (player.currentPlatform && player.currentPlatform.slope) {  
+              player.vy = player.vx * Math.tan(player.currentPlatform.slope * Math.PI / 180);  
+          }  
+          if (player.lastJumpChargeTime === 0) {  
+              player.jumpStartX = player.x;  
+              player.jumpStartY = player.y;  
+          }  
+      }  
+        
+      if (player.onGround) {  
+          if (Math.abs(player.x - preX) > 0.5 && now - player.lastMoveSoundTime > 350) {  
+              createSlimeBloop(300, 500, 0.15);  
+              player.lastMoveSoundTime = now;  
+          }  
+      }  
+    }  
+  
+    if (player.y < maxAltitude || maxAltitude === 0) maxAltitude = player.y;  
+      
+    let targetCameraY = player.y - height * 0.6;  
+    if (targetCameraY > 0) targetCameraY = 0;   
+    cameraY += (targetCameraY - cameraY) * 0.15;  
+      
+    let targetCameraX = player.x - width / 2;  
+    targetCameraX = Math.max(-STAGE_EXPAND, Math.min(STAGE_EXPAND, targetCameraX));  
+    cameraX += (targetCameraX - cameraX) * 0.15;  
+  
+    let currentAlt = Math.max(0, Math.floor((height - 100 - player.y) / PIXELS_PER_METER));  
+    currentAltElement.innerText = currentAlt;  
+      
+    if (currentAlt > bestScore) {  
+        bestScore = currentAlt;  
+    }  
+    maxAltElement.innerText = bestScore;  
+  
+    if (currentAlt >= 5000 && !achievements.story && !sessionFlags.story) {  
+        sessionFlags.story = true;  
+        achievements.story = true;  
+        if (!unlockedSkins.includes('story_clear')) unlockedSkins.push('story_clear');  
+        saveData();  
+        showAchievement("🎉 STORY CLEAR! (5000m) 🎉", "ストーリークリア実績解除！\n専用スキンを獲得しました！");  
+    }  
+    if (currentAlt >= 8000 && !achievements.extra && !sessionFlags.extra) {  
+        sessionFlags.extra = true;  
+        achievements.extra = true;  
+        if (!unlockedSkins.includes('extra_clear')) unlockedSkins.push('extra_clear');  
+        saveData();  
+        showAchievement("🔥 Jumping Mad Jump Machine 🔥", "8000m到達実績解除！\n専用スキンを獲得しました！");  
+    }  
+    if (currentAlt >= 15000 && !achievements.final && !sessionFlags.final) {  
+        sessionFlags.final = true;  
+        achievements.final = true;  
+        saveData();  
+        showAchievement("👑 完全クリア (15000m) 👑", "ゲーム完全クリア！\nあなたは真のジャンプマスターです！");  
+    }  
+  
+    if (generatedHighestPlatform.aabb.minY > cameraY - height) {  
+      generatedHighestPlatform = spawnNextPlatform(generatedHighestPlatform);  
+    }  
+  
+    let shakeX = 0;  
+    let shakeY = 0;  
+    if (hitStopEndTime > now && !player.isClimbing) {  
+      shakeX = (Math.random() - 0.5) * 8;  
+      shakeY = (Math.random() - 0.5) * 8;  
+    }  
+  
+    ctx.save();  
+    let camPX = cameraX * PARALLAX_FACTOR_CLOUD;  
+    let camPY = cameraY * PARALLAX_FACTOR_CLOUD;  
+    ctx.translate(-camPX + shakeX, -camPY + shakeY);  
+  
+    for (let c of clouds) {  
+        c.x += c.speed;  
+          
+        if (c.x > camPX + width + 100) {  
+            c.x = camPX - c.data.w - 50;  
+            c.y = camPY + Math.random() * height * 1.5 - height * 0.2;  
+            c.data = createCloudParts();  
+            c.speed = 0.1 + Math.random() * 0.3;  
+        }  
+        if (c.y > camPY + height + 100) {  
+            c.y = camPY - 100 - Math.random() * 200;  
+            c.x = camPX + Math.random() * (width + c.data.w) - c.data.w;  
+            c.data = createCloudParts();  
+        }  
+        if (c.y < camPY - 300) {  
+            c.y = camPY + height + 100 + Math.random() * 200;  
+            c.x = camPX + Math.random() * (width + c.data.w) - c.data.w;  
+            c.data = createCloudParts();  
+        }  
+  
+        let logicalY = c.y + cameraY * (1 - PARALLAX_FACTOR_CLOUD);  
+        let altMeters = (height - 40 - logicalY) / PIXELS_PER_METER;  
+          
+        if (altMeters > 20) {  
+            let fade = Math.min(1, (altMeters - 20) / 10);  
+            ctx.globalAlpha = fade;  
+              
+            ctx.save();  
+            ctx.translate(c.x, c.y);  
+            for (let p of c.data.parts) {  
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.op})`;  
+                ctx.fillRect(p.x, p.y, p.w, p.h);  
+            }  
+            ctx.restore();  
+            ctx.globalAlpha = 1.0;  
+        }  
+    }  
+    ctx.restore();  
+  
+    ctx.save();  
+    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);  
+  
+    let towerLeft = 48;  
+    let towerRight = width - 48;  
+    let towerWidth = towerRight - towerLeft;  
+    let groundY = height - 40;  
+    let topY = groundY - 15000 * PIXELS_PER_METER;  
+  
+    let screenTopY = cameraY;  
+    let screenBottomY = cameraY + height;  
+    let drawTop = Math.max(topY, screenTopY - 100);   
+    let drawBottom = Math.min(groundY, screenBottomY + 100);  
+  
+    if (drawTop < drawBottom) {  
+        let altBottom = (groundY - drawBottom) / PIXELS_PER_METER;  
+        let altTop = (groundY - drawTop) / PIXELS_PER_METER;  
+          
+        let ratioTop = Math.min(1, Math.max(0, altTop / 15000));  
+        let ratioBottom = Math.min(1, Math.max(0, altBottom / 15000));  
+          
+        function getTowerColor(ratio) {  
+            let r = Math.floor(200 * (1 - ratio) + 30 * ratio);  
+            let g = Math.floor(200 * (1 - ratio) + 30 * ratio);  
+            let b = Math.floor(200 * (1 - ratio) + 32 * ratio);  
+            return `rgb(${r}, ${g}, ${b})`;  
+        }  
+          
+        let grad = ctx.createLinearGradient(0, drawTop, 0, drawBottom);  
+        grad.addColorStop(0, getTowerColor(ratioTop));  
+        grad.addColorStop(1, getTowerColor(ratioBottom));  
+          
+        ctx.fillStyle = grad;  
+        ctx.fillRect(towerLeft, drawTop, towerWidth, drawBottom - drawTop);  
+          
+        let blockH = 64;  
+        let blockW = 128;  
+        let startY = Math.floor(drawTop / blockH) * blockH;  
+          
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";  
+        ctx.lineWidth = 2;  
+        ctx.beginPath();  
+        for (let y = startY; y <= drawBottom; y += blockH) {  
+            ctx.moveTo(towerLeft, y);  
+            ctx.lineTo(towerRight, y);  
+              
+            let rowIdx = Math.floor(y / blockH);  
+            let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);  
+            for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {  
+                let bx = x + offset;  
+                if (bx >= towerLeft && bx <= towerRight) {  
+                    ctx.moveTo(bx, y);  
+                    ctx.lineTo(bx, y + blockH);  
+                }  
+            }  
+        }  
+        ctx.stroke();  
+  
+        let mossLimitY = groundY - 5000 * PIXELS_PER_METER;  
+        if (drawBottom > mossLimitY) {  
+            let mossStart = Math.max(drawTop, mossLimitY);  
+            let startY_moss = Math.floor(mossStart / blockH) * blockH;  
+  
+            for (let y = startY_moss; y <= drawBottom; y += blockH) {  
+                let rowIdx = Math.floor(y / blockH);  
+                let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);  
+                  
+                let altRatio = Math.max(0, Math.min(1, (groundY - y) / (5000 * PIXELS_PER_METER)));  
+                let baseProb = 0.05 + 0.55 * altRatio;  
+  
+                for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {  
+                    let bx = x + offset;  
+                    if (bx > towerRight || bx + blockW < towerLeft) continue;  
+  
+                    let seed = bx * 13.1 + y * 97.3;  
+                    let spots = 3;   
+                    for(let s = 0; s < spots; s++) {  
+                        let spotSeed = seed + s * 11.1;  
+                        let r1 = pRand(spotSeed);  
+                          
+                        let spotX = bx + r1 * blockW;  
+                        if (spotX < towerLeft || spotX > towerRight) continue;  
+  
+                        let isShadow = false;  
+                        for (let p of activePlatforms) {  
+                            if (p.invisibleWall) continue;  
+                            if (spotX > p.x && spotX < p.x + p.w) {  
+                                if (p.y < y && p.y > y - blockH * 2.5) {  
+                                    isShadow = true;  
+                                    break;  
+                                }  
+                            }  
+                        }  
+  
+                        let prob = isShadow ? baseProb * 1.5 : baseProb;  
+                        if (pRand(spotSeed + 1) < prob) {  
+                            let isVine = pRand(spotSeed + 2) < 0.4;  
+                              
+                            if (!isVine) {  
+                                ctx.fillStyle = "rgba(45, 80, 40, 0.85)";  
+                                let mossCount = Math.floor(pRand(spotSeed + 3) * 6) + 3;  
+                                for(let i = 0; i < mossCount; i++) {  
+                                    let mx = spotX + (pRand(spotSeed + 4 + i) - 0.5) * 30;  
+                                    let my = y + pRand(spotSeed + 5 + i) * 20 - 5;  
+                                    let mw = 3 + pRand(spotSeed + 6 + i) * 6;  
+                                    let mh = 3 + pRand(spotSeed + 7 + i) * 6;  
+                                    ctx.fillRect(mx, my, mw, mh);  
+                                }  
+                            } else {  
+                                ctx.fillStyle = "rgba(30, 60, 25, 0.9)";  
+                                let vineLen = Math.floor(pRand(spotSeed + 3) * 8) + 4;  
+                                let curX = spotX;  
+                                let curY = y;  
+                                for(let v = 0; v < vineLen; v++) {  
+                                    ctx.fillRect(curX, curY, 3, 6);  
+                                    curY += 5;  
+                                    curX += (pRand(spotSeed + 10 + v) - 0.5) * 8;  
+                                      
+                                    if (pRand(spotSeed + 20 + v) < 0.7) {  
+                                        let leafSize = 4 + pRand(spotSeed + 30 + v) * 5;  
+                                        let dir = pRand(spotSeed + 40 + v) < 0.5 ? 1 : -1;  
+                                        ctx.beginPath();  
+                                        ctx.moveTo(curX, curY);  
+                                        ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);  
+                                        ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);  
+                                        ctx.fill();  
+                                    }  
+                                }  
+                            }  
+                        }  
+                    }  
+                }  
+            }  
+        }  
+    }  
+  
+    for (let sign of initialSigns) {  
+      ctx.fillStyle = '#5d4037';  
+      ctx.fillRect(sign.x - 2, sign.y - 25, 4, 25);  
+      ctx.fillStyle = '#8d6e63';  
+      ctx.fillRect(sign.x - 16, sign.y - 25, 32, 16);  
+      ctx.fillStyle = '#eebd9d';  
+      ctx.fillRect(sign.x - 14, sign.y - 23, 28, 12);  
+        
+      let bounce = Math.sin(now / 150) * 4;  
+      let iconY = sign.y - 35 + bounce;  
+  
+      ctx.fillStyle = "white";  
+      ctx.beginPath();  
+      ctx.arc(sign.x, iconY, 10, 0, Math.PI * 2);  
+      ctx.fill();  
+      ctx.beginPath();  
+      ctx.moveTo(sign.x - 4, iconY + 5);  
+      ctx.lineTo(sign.x + 4, iconY + 5);  
+      ctx.lineTo(sign.x, iconY + 14);  
+      ctx.fill();  
+  
+      ctx.fillStyle = "red";  
+      ctx.font = "bold 14px 'DotGothic16', sans-serif";  
+      ctx.textAlign = "center";  
+      ctx.textBaseline = "middle";  
+      ctx.fillText("！", sign.x, iconY);  
+    }  
+  
+    for (let p of activePlatforms) {  
+      if (p.invisibleWall) continue;   
+  
+      if (p.isGround) {  
+          let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;  
+          let endY = p.y + p.w * tan;  
+          drawPlatformLayer(ctx, p, endY, 4, p.h, '#3e2723');   
+          drawPlatformLayer(ctx, p, endY, 0, p.h, '#5d4037');   
+          drawPlatformLayer(ctx, p, endY, 0, 10, '#689f38');    
+          drawPlatformLayer(ctx, p, endY, 0, 3, '#8bc34a');     
+      } else {  
+          drawStonePlatform(ctx, p);  
+      }  
+  
+      if (p.chest && !p.chest.opened) {  
+          let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;  
+          let cY = p.y + (p.chest.x - p.x) * tan;  
+          drawChest(ctx, p.chest.type, p.chest.x, cY, p.slope || 0);  
+      }  
+    }  
+  
+    ctx.save();  
+      
+    let isCharging = isPressing && (player.onGround || player.isClimbing);  
+    let isCeilingBonk = hitStopEndTime > now && player.wallHitDir === 0 && !player.isClimbing;  
+    let isFloorBonk = hitStopEndTime > now && player.wallHitDir === 2 && !player.isClimbing;  
+    let isLeftBonk = hitStopEndTime > now && player.wallHitDir === 1 && !player.isClimbing;  
+    let isRightBonk = hitStopEndTime > now && player.wallHitDir === -1 && !player.isClimbing;  
+    let inAir = !player.onGround && !player.isClimbing && hitStopEndTime <= now;  
+    let speed = Math.hypot(player.vx, player.vy);  
+  
+    let sw = player.size;  
+    let sh = player.size;  
+    let pSlope = (player.wallHitPlatform && player.wallHitPlatform.slope) ? player.wallHitPlatform.slope * Math.PI / 180 : 0;  
+      
+    let cx = player.x;  
+    let cy = player.y + sh / 2;  
+      
+    if (isLeftBonk || isRightBonk || player.isClimbing) {  
+        let p = player.wallHitPlatform;  
+        if (p) {  
+            let wallFaceX = (player.wallHitDir === 1) ? p.x : p.x + p.w;  
+            cx = wallFaceX;   
+            cy = player.y;   
+  
+            if (player.isClimbing) {  
+                let ratio = (now - player.climbStartTime) / player.climbDuration;  
+                if (ratio >= 0.6) {  
+                    let t = (ratio - 0.6) / 0.4;  
+                    t = Math.sin(t * Math.PI / 2);  
+                    cx = cx + (player.x - cx) * t;  
+                    cy = cy + ((player.y + sh/2) - cy) * t;  
+                }  
+            }  
+        }  
+    }  
+  
+    ctx.translate(cx, cy);  
+  
+    let grad = ctx.createLinearGradient(0, -sh, 0, sh*0.5);  
+    grad.addColorStop(0, '#4fc3f7');  
+    grad.addColorStop(0.5, '#03a9f4');  
+    grad.addColorStop(1, '#0288d1');  
+    ctx.fillStyle = grad;  
+    ctx.strokeStyle = '#01579b';  
+    ctx.lineWidth = 2;  
+  
+    if (player.isClimbing) {  
+        let ratio = (now - player.climbStartTime) / player.climbDuration;  
+        let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 : Math.PI / 2;  
+        let groundAngle = pSlope;  
+        let climbAngle;  
+          
+        if (ratio < 0.6) {  
+            climbAngle = wallAngle;  
+        } else {  
+            let t = (ratio - 0.6) / 0.4;  
+            t = Math.sin(t * Math.PI / 2);   
+            climbAngle = wallAngle + (groundAngle - wallAngle) * t;  
+        }  
+  
+        ctx.rotate(climbAngle);  
+          
+        let tremble = isPressing ? (Math.random() - 0.5) * 3 : 0;  
+        drawSlime(ctx, sw, sh, isPressing, tremble);  
+          
+    } else if (isLeftBonk || isRightBonk) {  
+        let pType = player.wallHitType;  
+        let bendMag = 0;  
+        if (pType === 1) bendMag = 0.3;         
+        else if (pType === 2) bendMag = 1.0;    
+        else bendMag = 0.6;                     
+  
+        let bend = (player.wallHitDir === 1) ? -bendMag : bendMag;  
+        let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 : Math.PI / 2;  
+        ctx.rotate(wallAngle);  
+  
+        drawSlime(ctx, sw, sh, false, 0, bend);  
+          
+    } else if (isCeilingBonk || isFloorBonk) {  
+        ctx.translate(0, -sh/2);  
+        let domeAngle = isCeilingBonk ? (Math.PI + pSlope) : pSlope;  
+        ctx.rotate(domeAngle);  
+          
+        let r = sw * 0.7;   
+        let flatY = sh * 0.5;   
+        let domeY = -sh * 0.2;   
+  
+        ctx.beginPath();  
+        ctx.moveTo(-r, flatY);  
+        ctx.quadraticCurveTo(-r, domeY, 0, domeY);  
+        ctx.quadraticCurveTo(r, domeY, r, flatY);  
+        ctx.closePath();  
+        ctx.fill();  
+        ctx.stroke();  
+          
+    } else if (inAir) {  
+        let angle = Math.atan2(player.vy, player.vx);  
+        let stretch = Math.min(speed / 15, 1.0);  
+        ctx.translate(0, -sh/2);  
+        ctx.rotate(angle);  
+          
+        let r = sh * 0.5;  
+        let frontStretch = 1 + stretch * 0.6;   
+        let backStretch = 1 + stretch * 0.2;    
+        let frontWidth = r * (1 + stretch * 0.4);   
+        let backWidth = r * (1 - stretch * 0.1);    
+        drawTeardrop(ctx, r, frontStretch, backStretch, frontWidth, backWidth);  
+          
+    } else if (isCharging) {  
+        let tremble = (Math.random() - 0.5) * 3;  
+        let groundSlope = (player.currentPlatform && player.currentPlatform.slope) ? player.currentPlatform.slope * Math.PI / 180 : 0;  
+        ctx.rotate(groundSlope);  
+          
+        drawSlime(ctx, sw, sh, true, tremble);  
+          
+    } else {  
+        let groundSlope = (player.currentPlatform && player.currentPlatform.slope) ? player.currentPlatform.slope * Math.PI / 180 : 0;  
+        ctx.rotate(groundSlope);  
+  
+        if (Math.abs(player.vx) > 0.1) {  
+            let lean = -Math.min(Math.max(player.vx * 0.05, -0.4), 0.4);   
+            ctx.transform(1, 0, lean, 1, 0, 0);   
+            let bounce = Math.sin(now / 50) * Math.min(Math.abs(player.vx) * 0.05, 0.2);  
+            ctx.scale(1.0 - bounce, 1.0 + bounce);  
+        }  
+          
+        drawSlime(ctx, sw, sh, false, 0);  
+    }  
+  
+    ctx.restore();  
+  
+    ctx.save();  
+    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);  
+    for (let p of activePlatforms) {  
+        if (p.invisibleWall) continue;  
+        if (p.isSafety && !p.isGround) {  
+            drawParapet(ctx, p);  
+        }  
+    }  
+    ctx.restore();  
+  
+    if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {  
+      ctx.font = "16px 'DotGothic16', sans-serif";  
+      ctx.textAlign = "center";  
+      ctx.textBaseline = "middle";  
+      let wobble = Math.sin(now / 50) * 5;  
+      ctx.fillText("💫", player.x - cameraX + wobble, player.y - cameraY - player.size/2 - 12);  
+    }  
+  
+    let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;  
+    if (isWallHit || player.isClimbing) {  
+      ctx.textAlign = "center";  
+      ctx.textBaseline = "middle";  
+      let iconX = player.x + (player.wallHitDir * 15);  
+        
+      if (player.isClimbing) {  
+        let flash = Math.floor(now / 50) % 2 === 0;  
+        ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";  
+        ctx.globalAlpha = 1.0;   
+        ctx.fillText("🖐️", iconX - cameraX, player.y - cameraY - player.size/2 - 15);  
+      } else {  
+        ctx.font = "20px 'DotGothic16', sans-serif";  
+        let bounce = Math.sin(now / 100) * 3;  
+        ctx.fillText("🖐️", iconX - cameraX, player.y - cameraY - player.size/2 - 15 + bounce);  
+      }  
+    }  
+  
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {  
+        let ft = floatingTexts[i];  
+        ft.life--;  
+        ft.y -= 1;  
+        ctx.globalAlpha = ft.life / ft.maxLife;  
+        ctx.fillStyle = ft.color;  
+        ctx.font = "bold 20px 'DotGothic16', sans-serif";  
+        ctx.textAlign = "center";  
+        ctx.strokeStyle = "#333";  
+        ctx.lineWidth = 3;  
+        ctx.strokeText(ft.text, ft.x - cameraX, ft.y - cameraY);  
+        ctx.fillText(ft.text, ft.x - cameraX, ft.y - cameraY);  
+        ctx.globalAlpha = 1.0;  
+        if (ft.life <= 0) floatingTexts.splice(i, 1);  
+    }  
+  
+    ctx.restore();  
+    requestAnimationFrame(update);  
+  }  
+</script>  
+</body>  
+</html>
