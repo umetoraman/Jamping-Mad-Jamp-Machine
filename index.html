@@ -672,7 +672,7 @@
     wallHitDir: 0, 
     wallHitPlatform: null,
     wallHitType: 3, 
-    preHitVx: 0,  // 衝突前のX方向推進力保持用
+    preHitVx: 0,  
     
     confusionEndTime: 0,
     hitStopCooldownEndTime: 0,
@@ -1759,7 +1759,12 @@
       // よじ登り失敗時のノックバック処理
       if (player.wallHitPlatform !== null && !player.isClimbing) {
           if (player.wallHitDir === 1 || player.wallHitDir === -1) {
-              player.airVx = -player.preHitVx; // 直前の推進力を反転
+              let bounceVx = -player.preHitVx;
+              // 最低限の反発力を保証して壁への再癒着を防止
+              if (player.wallHitDir === 1 && bounceVx > -2) bounceVx = -2;
+              if (player.wallHitDir === -1 && bounceVx < 2) bounceVx = 2;
+              
+              player.airVx = bounceVx;
               player.vx = player.airVx;
               player.vy = -3; // 軽く弾かれる跳ね返り
               player.onGround = false;
@@ -2074,7 +2079,7 @@
               else if (cTopRatio <= 50) hType = 2;    
               else hType = 3;                         
 
-              let oldVx = player.vx; // 衝突直前の推進力を記録
+              let oldVx = player.vx;
 
               if (hitFromLeft) player.x = p.x - rMax;
               else player.x = (p.x + p.w) + rMax;
@@ -2097,7 +2102,6 @@
                       player.wallHitType = hType;
                       player.wallHitPlatform = p;
                       
-                      player.y = wTop;
                       player.preHitVx = oldVx; // 跳ね返り用に保存
                   }
               }
@@ -2424,24 +2428,25 @@
     if (isLeftBonk || isRightBonk || player.isClimbing) {
         let p = player.wallHitPlatform;
         if (p) {
+            let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
             let wallFaceX = (player.wallHitDir === 1) ? p.x : p.x + p.w;
+            let wTop = p.y + (wallFaceX - p.x) * tan;
             cx = wallFaceX; 
 
-            // 壁張り付き・よじ登り時のY座標調整（先端が角にピッタリ合うように）
             if (player.isClimbing) {
                 let ratio = (now - player.climbStartTime) / player.climbDuration;
                 if (ratio < 0.6) {
-                    cy = player.y + (sw * 0.35);
+                    cy = wTop + (sw * 0.65);
                 } else {
                     let t = (ratio - 0.6) / 0.4;
                     t = Math.sin(t * Math.PI / 2);
                     cx = cx + (player.x - cx) * t;
-                    let startCy = player.climbTargetY + (sw * 0.35);
-                    let targetCy = player.y + sh / 2;
+                    let startCy = wTop + (sw * 0.65);
+                    let targetCy = player.climbTargetY + sh / 2;
                     cy = startCy + (targetCy - startCy) * t;
                 }
             } else {
-                cy = player.y + (sw * 0.35);
+                cy = wTop + (sw * 0.65);
             }
         }
     }
@@ -2541,8 +2546,8 @@
 
     ctx.restore();
 
-    // 防壁の描画（二重translateバグの修正）
     ctx.save();
+    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.isSafety && !p.isGround) {
@@ -2551,37 +2556,48 @@
     }
     ctx.restore();
 
-    // アイコンの描画（カメラ補正が二重にかかるバグを修正）
     if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
       ctx.font = "16px 'DotGothic16', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       let wobble = Math.sin(now / 50) * 5;
       
+      let iconX = player.x;
       let iconY = player.y - player.size/2 - 12;
-      let isCeilingBonk = hitStopEndTime > now && player.wallHitDir === 0 && !player.isClimbing;
-      if (isCeilingBonk) {
+
+      let isCeilBonkCheck = hitStopEndTime > now && player.wallHitDir === 0 && !player.isClimbing;
+      if (isCeilBonkCheck) {
           iconY = player.y + player.size/2 + 15;
       }
-      ctx.fillText("💫", player.x + wobble, iconY);
+      ctx.fillText("💫", iconX - cameraX + shakeX + wobble, iconY - cameraY + shakeY);
     }
 
     let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;
     if (isWallHit || player.isClimbing) {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let iconX = player.x + (player.wallHitDir * 15);
-      let iconY = player.y - player.size/2 - 15;
+      
+      let p = player.wallHitPlatform;
+      let wallFaceX = player.x;
+      let wTop = player.y;
+      if (p) {
+          let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
+          wallFaceX = (player.wallHitDir === 1) ? p.x : p.x + p.w;
+          wTop = p.y + (wallFaceX - p.x) * tan;
+      }
+      
+      let iconX = wallFaceX + (player.wallHitDir === 1 ? -20 : 20);
+      let iconY = wTop - 25;
       
       if (player.isClimbing) {
         let flash = Math.floor(now / 50) % 2 === 0;
         ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";
         ctx.globalAlpha = 1.0; 
-        ctx.fillText("🖐️", iconX, iconY);
+        ctx.fillText("🖐️", iconX - cameraX + shakeX, iconY - cameraY + shakeY);
       } else {
         ctx.font = "20px 'DotGothic16', sans-serif";
         let bounce = Math.sin(now / 100) * 3;
-        ctx.fillText("🖐️", iconX, iconY + bounce);
+        ctx.fillText("🖐️", iconX - cameraX + shakeX, iconY - cameraY + shakeY + bounce);
       }
     }
 
@@ -2595,8 +2611,8 @@
         ctx.textAlign = "center";
         ctx.strokeStyle = "#333";
         ctx.lineWidth = 3;
-        ctx.strokeText(ft.text, ft.x, ft.y);
-        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.strokeText(ft.text, ft.x - cameraX + shakeX, ft.y - cameraY + shakeY);
+        ctx.fillText(ft.text, ft.x - cameraX + shakeX, ft.y - cameraY + shakeY);
         ctx.globalAlpha = 1.0;
         if (ft.life <= 0) floatingTexts.splice(i, 1);
     }
