@@ -339,8 +339,7 @@
 <canvas id="gameCanvas"></canvas>  
   
 <script>  
-  // --- パスコードロック処理 ---
-  const SECRET_CODE = "7777"; // ★ここを変更するとパスコードが変わります
+  const SECRET_CODE = "7777"; 
   
   const lockScreen = document.getElementById('lockScreen');
   const unlockBtn = document.getElementById('unlockBtn');
@@ -359,7 +358,6 @@
   passcodeInput.addEventListener('keypress', (e) => {
     if(e.key === 'Enter') unlockBtn.click();
   });
-  // -------------------------
 
   const IS_TEST_MODE = true;   
   
@@ -814,28 +812,34 @@
       ctx.fill();  
   }  
   
-  // 石ブロック足場の描画関数（台形クリッピング適用）
+  // 石ブロック足場の描画関数（台形クリッピング適用、+1度オーバーラップ対応）
   function drawStonePlatform(ctx, p) {  
       ctx.save();  
       ctx.translate(p.x, p.y);  
       
       let currentSlope = p.slope || 0;
-      ctx.rotate(currentSlope * Math.PI / 180);  
+      let S = currentSlope * Math.PI / 180;
+      ctx.rotate(S);  
+      
+      // 回転後の水平幅を補正し、物理判定領域と視覚領域の斜めの長さを一致させる
+      let slantW = p.w / Math.cos(S);
       
       let dx_R = 0;
       let dx_L = 0;
+      let overlapDeg = 1.0; // 隙間を埋めるためのオーバーラップ角
       if (p.isRightConnected && p.rightSlope !== undefined) {
-          dx_R = p.h * Math.tan((currentSlope - p.rightSlope) / 2 * Math.PI / 180);
+          let bisect = (currentSlope - p.rightSlope) / 2;
+          dx_R = p.h * Math.tan((bisect + overlapDeg) * Math.PI / 180);
       }
       if (p.isLeftConnected && p.leftSlope !== undefined) {
-          dx_L = p.h * Math.tan((currentSlope - p.leftSlope) / 2 * Math.PI / 180);
+          let bisect = (currentSlope - p.leftSlope) / 2;
+          dx_L = p.h * Math.tan((bisect - overlapDeg) * Math.PI / 180);
       }
 
-      // 台形クリッピングパス
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(p.w, 0);
-      ctx.lineTo(p.w + dx_R, p.h);
+      ctx.lineTo(slantW, 0);
+      ctx.lineTo(slantW + dx_R, p.h);
       ctx.lineTo(dx_L, p.h);
       ctx.closePath();
       ctx.clip();
@@ -844,16 +848,13 @@
       let cols = ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#646464', '#2a2a2a'];  
       let seed = p.x * 1.3 + p.y * 2.7;  
         
-      // 描画領域をクリッピングに合わせて拡張
       let minX = Math.floor(Math.min(0, dx_L));
-      let maxX = Math.ceil(Math.max(p.w, p.w + dx_R));
+      let maxX = Math.ceil(Math.max(slantW, slantW + dx_R));
       let drawW = maxX - minX;
 
-      // 目地（背景）  
       ctx.fillStyle = '#222';  
       ctx.fillRect(minX, 0, drawW, p.h);  
   
-      // ブロック  
       for (let y = 0; y < p.h; y += bH) {  
           let x = minX;  
           let rowSeed = seed + y * 11.1;  
@@ -1308,7 +1309,6 @@
         };   
     }  
     
-    // 足場の接続判定と角度情報の付与
     for (let i = 0; i < pObjs.length; i++) {  
         pObjs[i].isLeftConnected = (i > 0);  
         pObjs[i].isRightConnected = (i < pObjs.length - 1);  
@@ -1359,6 +1359,16 @@
     }  
     return active;  
   }  
+
+  // 外側の傾斜面に沿ったX座標を取得する関数
+  function getLeftWallX(p, targetY) {
+      let S = (p.slope || 0) * Math.PI / 180;
+      return p.x - (targetY - p.y) * Math.tan(S);
+  }
+  function getRightWallX(p, targetY) {
+      let S = (p.slope || 0) * Math.PI / 180;
+      return p.x + p.w - (targetY - p.y - p.w * Math.tan(S)) * Math.tan(S);
+  }
   
   function startAction() {  
     initAudio();  
@@ -1381,11 +1391,14 @@
         player.climbStartY = player.y;   
         player.climbStartX = player.x;   
           
-        let tan = player.wallHitPlatform.slope ? Math.tan(player.wallHitPlatform.slope * Math.PI / 180) : 0;  
+        let p = player.wallHitPlatform;
+        let S = (p.slope || 0) * Math.PI / 180;
+        let tan = Math.tan(S);  
+        
         let climbEndX = (player.wallHitDir === 1)   
-            ? player.wallHitPlatform.x + player.size * 0.5   
-            : player.wallHitPlatform.x + player.wallHitPlatform.w - player.size * 0.5;  
-        let climbEndY = player.wallHitPlatform.y + (climbEndX - player.wallHitPlatform.x) * tan - (player.size * 0.95 / 2);  
+            ? p.x + player.size * 0.5   
+            : p.x + p.w * Math.cos(S) - player.size * 0.5;  
+        let climbEndY = p.y + (climbEndX - p.x) * tan - (player.size * 0.95 / 2);  
           
         player.climbTargetY = climbEndY;  
         player.climbTargetX = climbEndX;  
@@ -2014,8 +2027,11 @@
   
             let hitFromAbove = (oBottom <= oldSurfaceY + 15) || (wasOnGround && player.vy >= -2);  
             let hitFromBelow = oTop >= bottomY - 12;  
-            let hitFromLeft  = oRight <= p.x + 8;  
-            let hitFromRight = oLeft >= p.x + p.w - 8;  
+            
+            // 物理的な壁判定を傾斜に合わせる
+            let targetEdgeY = Math.max(p.y, oBottom);
+            let hitFromLeft  = oRight <= getLeftWallX(p, targetEdgeY) + 12;  
+            let hitFromRight = oLeft >= getRightWallX(p, targetEdgeY) - 12;  
   
             if (hitFromAbove && player.vy >= 0) {  
               let newY = surfaceY - (shapeBottom - player.y);  
@@ -2126,8 +2142,9 @@
               else if (cTopRatio <= 50) hType = 2;    
               else hType = 3;                         
   
-              if (hitFromLeft) player.x = p.x - rMax;  
-              else player.x = (p.x + p.w) + rMax;  
+              // 傾斜角に合わせて座標をスナップ
+              if (hitFromLeft) player.x = getLeftWallX(p, player.y) - rMax;  
+              else player.x = getRightWallX(p, player.y) + rMax;  
                 
               player.airVx = 0;  
               player.vx = 0;  
@@ -2470,10 +2487,13 @@
     let cx = player.x;  
     let cy = player.y + sh / 2;  
       
+    // 傾斜面へのスナップグラフィック調整
     if (isLeftBonk || isRightBonk || player.isClimbing) {  
         let p = player.wallHitPlatform;  
         if (p) {  
-            let wallFaceX = (player.wallHitDir === 1) ? p.x : p.x + p.w;  
+            let wallFaceX = (player.wallHitDir === 1) 
+                ? getLeftWallX(p, player.y) 
+                : getRightWallX(p, player.y);
             cx = wallFaceX;   
             cy = player.y;   
   
@@ -2501,8 +2521,8 @@
   
     if (player.isClimbing) {  
         let ratio = (now - player.climbStartTime) / player.climbDuration;  
-        let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 : Math.PI / 2;  
-        let groundAngle = pSlope;  
+        let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 + (pSlope * Math.PI / 180) : Math.PI / 2 + (pSlope * Math.PI / 180);  
+        let groundAngle = pSlope * Math.PI / 180;  
         let climbAngle;  
           
         if (ratio < 0.6) {  
@@ -2526,14 +2546,14 @@
         else bendMag = 0.6;                     
   
         let bend = (player.wallHitDir === 1) ? -bendMag : bendMag;  
-        let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 : Math.PI / 2;  
+        let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 + (pSlope * Math.PI / 180) : Math.PI / 2 + (pSlope * Math.PI / 180);  
         ctx.rotate(wallAngle);  
   
         drawSlime(ctx, sw, sh, false, 0, bend);  
           
     } else if (isCeilingBonk || isFloorBonk) {  
         ctx.translate(0, -sh/2);  
-        let domeAngle = isCeilingBonk ? (Math.PI + pSlope) : pSlope;  
+        let domeAngle = isCeilingBonk ? (Math.PI + (pSlope * Math.PI / 180)) : (pSlope * Math.PI / 180);  
         ctx.rotate(domeAngle);  
           
         let r = sw * 0.7;   
@@ -2584,22 +2604,21 @@
   
     ctx.restore();  
   
-    ctx.save();  
-    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);  
+    // パラペットをメインカメラコンテキストで描画（二重変換バグ修正）
     for (let p of activePlatforms) {  
         if (p.invisibleWall) continue;  
         if (p.isSafety && !p.isGround) {  
             drawParapet(ctx, p);  
         }  
     }  
-    ctx.restore();  
   
+    // UIアイコン描画（カメラ座標減算バグ修正）
     if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {  
       ctx.font = "16px 'DotGothic16', sans-serif";  
       ctx.textAlign = "center";  
       ctx.textBaseline = "middle";  
       let wobble = Math.sin(now / 50) * 5;  
-      ctx.fillText("💫", player.x - cameraX + wobble, player.y - cameraY - player.size/2 - 12);  
+      ctx.fillText("💫", player.x + wobble, player.y - player.size/2 - 12);  
     }  
   
     let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;  
@@ -2612,11 +2631,11 @@
         let flash = Math.floor(now / 50) % 2 === 0;  
         ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";  
         ctx.globalAlpha = 1.0;   
-        ctx.fillText("🖐️", iconX - cameraX, player.y - cameraY - player.size/2 - 15);  
+        ctx.fillText("🖐️", iconX, player.y - player.size/2 - 15);  
       } else {  
         ctx.font = "20px 'DotGothic16', sans-serif";  
         let bounce = Math.sin(now / 100) * 3;  
-        ctx.fillText("🖐️", iconX - cameraX, player.y - cameraY - player.size/2 - 15 + bounce);  
+        ctx.fillText("🖐️", iconX, player.y - player.size/2 - 15 + bounce);  
       }  
     }  
   
@@ -2630,8 +2649,8 @@
         ctx.textAlign = "center";  
         ctx.strokeStyle = "#333";  
         ctx.lineWidth = 3;  
-        ctx.strokeText(ft.text, ft.x - cameraX, ft.y - cameraY);  
-        ctx.fillText(ft.text, ft.x - cameraX, ft.y - cameraY);  
+        ctx.strokeText(ft.text, ft.x, ft.y);  
+        ctx.fillText(ft.text, ft.x, ft.y);  
         ctx.globalAlpha = 1.0;  
         if (ft.life <= 0) floatingTexts.splice(i, 1);  
     }  
