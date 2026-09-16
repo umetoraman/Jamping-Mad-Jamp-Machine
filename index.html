@@ -1756,7 +1756,6 @@
     } else if (hitStopEndTime > now) {
       player.vx = 0; 
     } else {
-      // よじ登り失敗時のノックバック処理
       if (player.wallHitPlatform !== null && !player.isClimbing) {
           if (player.wallHitDir === 1 || player.wallHitDir === -1) {
               let bounceVx = -player.preHitVx;
@@ -2101,7 +2100,7 @@
                       player.wallHitType = hType;
                       player.wallHitPlatform = p;
                       
-                      player.preHitVx = oldVx; // 跳ね返り用に保存
+                      player.preHitVx = oldVx; 
                   }
               }
             }
@@ -2546,7 +2545,6 @@
     ctx.restore();
 
     ctx.save();
-    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.isSafety && !p.isGround) {
@@ -2555,6 +2553,7 @@
     }
     ctx.restore();
 
+    // 【完全修正版】カメラ座標と揺れ（shake）の二重加算を完全に排除
     if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
       ctx.font = "16px 'DotGothic16', sans-serif";
       ctx.textAlign = "center";
@@ -2564,8 +2563,7 @@
       let iconX = player.x;
       let iconY = player.y - player.size/2 - 12;
 
-      // 修正: 天井激突時に下へ表示させる処理を削除し、常に頭上に表示
-      ctx.fillText("💫", iconX - cameraX + shakeX + wobble, iconY - cameraY + shakeY);
+      ctx.fillText("💫", iconX + wobble, iconY);
     }
 
     let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;
@@ -2589,11 +2587,11 @@
         let flash = Math.floor(now / 50) % 2 === 0;
         ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";
         ctx.globalAlpha = 1.0; 
-        ctx.fillText("🖐️", iconX - cameraX + shakeX, iconY - cameraY + shakeY);
+        ctx.fillText("🖐️", iconX, iconY);
       } else {
         ctx.font = "20px 'DotGothic16', sans-serif";
         let bounce = Math.sin(now / 100) * 3;
-        ctx.fillText("🖐️", iconX - cameraX + shakeX, iconY - cameraY + shakeY + bounce);
+        ctx.fillText("🖐️", iconX, iconY + bounce);
       }
     }
 
@@ -2607,13 +2605,13 @@
         ctx.textAlign = "center";
         ctx.strokeStyle = "#333";
         ctx.lineWidth = 3;
-        ctx.strokeText(ft.text, ft.x - cameraX + shakeX, ft.y - cameraY + shakeY);
-        ctx.fillText(ft.text, ft.x - cameraX + shakeX, ft.y - cameraY + shakeY);
+        ctx.strokeText(ft.text, ft.x, ft.y);
+        ctx.fillText(ft.text, ft.x, ft.y);
         ctx.globalAlpha = 1.0;
         if (ft.life <= 0) floatingTexts.splice(i, 1);
     }
 
-    ctx.restore();
+    ctx.restore(); // メインカメラの終了
     requestAnimationFrame(update);
   }
 </script>
