@@ -1760,13 +1760,12 @@
       if (player.wallHitPlatform !== null && !player.isClimbing) {
           if (player.wallHitDir === 1 || player.wallHitDir === -1) {
               let bounceVx = -player.preHitVx;
-              // 最低限の反発力を保証して壁への再癒着を防止
               if (player.wallHitDir === 1 && bounceVx > -2) bounceVx = -2;
               if (player.wallHitDir === -1 && bounceVx < 2) bounceVx = 2;
               
               player.airVx = bounceVx;
               player.vx = player.airVx;
-              player.vy = -3; // 軽く弾かれる跳ね返り
+              player.vy = -3; 
               player.onGround = false;
           }
           player.wallHitPlatform = null;
@@ -2565,10 +2564,7 @@
       let iconX = player.x;
       let iconY = player.y - player.size/2 - 12;
 
-      let isCeilBonkCheck = hitStopEndTime > now && player.wallHitDir === 0 && !player.isClimbing;
-      if (isCeilBonkCheck) {
-          iconY = player.y + player.size/2 + 15;
-      }
+      // 修正: 天井激突時に下へ表示させる処理を削除し、常に頭上に表示
       ctx.fillText("💫", iconX - cameraX + shakeX + wobble, iconY - cameraY + shakeY);
     }
 
