@@ -2451,6 +2451,45 @@
 
     ctx.translate(cx, cy);
 
+    // ---------------------------------------------------------
+    // 【ユーザー提案の採用】キャラクターのローカル座標系内でアイコンを描画
+    // スライムの(0, 0)は底面。頭頂部は -sh 付近。
+    // ---------------------------------------------------------
+    
+    // 1. 混乱アイコン
+    if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
+        ctx.font = "16px 'DotGothic16', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        let wobble = Math.sin(now / 50) * 5;
+        // キャラクターの物理中心(player.x)からの差分を利用し、確実にスライムの頭上に配置
+        let iconLocalX = (player.x - cx) + wobble;
+        let iconLocalY = -sh - 16; 
+        ctx.fillText("💫", iconLocalX, iconLocalY);
+    }
+
+    // 2. よじ登りアイコン
+    let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;
+    if (isWallHit || player.isClimbing) {
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // ローカル座標において cx は壁の接点なので、そこから壁側へ少しズラす
+        let localIconX = (player.wallHitDir === 1) ? -18 : 18;
+        let localIconY = -sh - 5; 
+        
+        if (player.isClimbing) {
+            let flash = Math.floor(now / 50) % 2 === 0;
+            ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";
+            ctx.globalAlpha = 1.0; 
+            ctx.fillText("🖐️", localIconX, localIconY);
+        } else {
+            ctx.font = "20px 'DotGothic16', sans-serif";
+            let bounce = Math.sin(now / 100) * 3;
+            ctx.fillText("🖐️", localIconX, localIconY + bounce);
+        }
+    }
+    // ---------------------------------------------------------
+
     let grad = ctx.createLinearGradient(0, -sh, 0, sh*0.5);
     grad.addColorStop(0, '#4fc3f7');
     grad.addColorStop(0.5, '#03a9f4');
@@ -2553,48 +2592,6 @@
     }
     ctx.restore();
 
-    // 【完全修正版】カメラ座標と揺れ（shake）の二重加算を完全に排除
-    if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
-      ctx.font = "16px 'DotGothic16', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      let wobble = Math.sin(now / 50) * 5;
-      
-      let iconX = player.x;
-      let iconY = player.y - player.size/2 - 12;
-
-      ctx.fillText("💫", iconX + wobble, iconY);
-    }
-
-    let isWallHit = hitStopEndTime > now && (player.wallHitDir === 1 || player.wallHitDir === -1) && !player.isClimbing;
-    if (isWallHit || player.isClimbing) {
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      
-      let p = player.wallHitPlatform;
-      let wallFaceX = player.x;
-      let wTop = player.y;
-      if (p) {
-          let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
-          wallFaceX = (player.wallHitDir === 1) ? p.x : p.x + p.w;
-          wTop = p.y + (wallFaceX - p.x) * tan;
-      }
-      
-      let iconX = wallFaceX + (player.wallHitDir === 1 ? -20 : 20);
-      let iconY = wTop - 25;
-      
-      if (player.isClimbing) {
-        let flash = Math.floor(now / 50) % 2 === 0;
-        ctx.font = flash ? "28px 'DotGothic16', sans-serif" : "18px 'DotGothic16', sans-serif";
-        ctx.globalAlpha = 1.0; 
-        ctx.fillText("🖐️", iconX, iconY);
-      } else {
-        ctx.font = "20px 'DotGothic16', sans-serif";
-        let bounce = Math.sin(now / 100) * 3;
-        ctx.fillText("🖐️", iconX, iconY + bounce);
-      }
-    }
-
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i];
         ft.life--;
@@ -2611,7 +2608,7 @@
         if (ft.life <= 0) floatingTexts.splice(i, 1);
     }
 
-    ctx.restore(); // メインカメラの終了
+    ctx.restore(); 
     requestAnimationFrame(update);
   }
 </script>
