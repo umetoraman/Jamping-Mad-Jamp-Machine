@@ -399,6 +399,33 @@
       return h - Math.floor(h);
   }
 
+  // --- 塔の色の計算と円柱表現の追加 ---
+  function getBaseTowerColor(altMeters) {
+      let clampedAlt = Math.max(0, Math.min(8000, altMeters));
+      let step = Math.floor(clampedAlt / 1000); 
+      let ratio = step / 8; 
+      let r = Math.floor(180 - 80 * ratio); 
+      let g = Math.floor(180 - 80 * ratio);
+      let b = Math.floor(180 - 78 * ratio); 
+      return {r: r, g: g, b: b};
+  }
+
+  function getCylinderColor(baseColor, x, blockW, towerLeft, towerRight) {
+      let center = (towerLeft + towerRight) / 2;
+      let blockCenter = x + blockW / 2;
+      blockCenter = Math.max(towerLeft, Math.min(towerRight, blockCenter));
+      let dist = Math.abs(blockCenter - center);
+      let maxDist = (towerRight - towerLeft) / 2;
+      
+      let factor = 1.0 - Math.pow(dist / maxDist, 2.0) * 0.5; 
+      
+      let r = Math.floor(baseColor.r * factor);
+      let g = Math.floor(baseColor.g * factor);
+      let b = Math.floor(baseColor.b * factor);
+      return `rgb(${r}, ${g}, ${b})`;
+  }
+  // ------------------------------------
+
   function saveData() {
       localStorage.setItem('jm_totalCoins', totalCoins);
       localStorage.setItem('jm_bestScore', bestScore);
@@ -739,22 +766,6 @@
       return { beta: beta * rad2deg, gamma: gamma * rad2deg };
   }
 
-  function getTowerBaseColorRGB(ratio) {
-      let r = Math.floor(200 * (1 - ratio) + 30 * ratio);
-      let g = Math.floor(200 * (1 - ratio) + 30 * ratio);
-      let b = Math.floor(200 * (1 - ratio) + 32 * ratio);
-      return {r, g, b};
-  }
-
-  function getPlatformColors(y) {
-      let groundY = height - 40;
-      let altRatio = Math.max(0, Math.min(1, (groundY - y) / (15000 * PIXELS_PER_METER)));
-      let base = getTowerBaseColorRGB(altRatio);
-      
-      let mul = [0.6, 0.7, 0.8, 0.9, 0.5];
-      return mul.map(m => `rgb(${Math.floor(base.r * m)}, ${Math.floor(base.g * m)}, ${Math.floor(base.b * m)})`);
-  }
-
   function drawPlatformLayer(ctx, p, endY, yOffset, thickness, color) {
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -783,7 +794,20 @@
       ctx.clip();
       
       let bH = 10;
-      let cols = getPlatformColors(p.y);
+      let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
+      let tColor = getBaseTowerColor(altMeters);
+      let bR = Math.floor(tColor.r * 0.7);
+      let bG = Math.floor(tColor.g * 0.7);
+      let bB = Math.floor(tColor.b * 0.7);
+      
+      let cols = [
+          `rgb(${bR}, ${bG}, ${bB})`,
+          `rgb(${Math.max(0, bR-10)}, ${Math.max(0, bG-10)}, ${Math.max(0, bB-10)})`,
+          `rgb(${Math.min(255, bR+10)}, ${Math.min(255, bG+10)}, ${Math.min(255, bB+10)})`,
+          `rgb(${Math.max(0, bR-20)}, ${Math.max(0, bG-20)}, ${Math.max(0, bB-20)})`,
+          `rgb(${Math.floor(bR*0.8)}, ${Math.floor(bG*0.8)}, ${Math.floor(bB*0.8)})`
+      ];
+
       let seed = p.x * 1.3 + p.y * 2.7;
       
       let minX = Math.min(0, oL, p.w, p.w + oR) - 20;
@@ -793,10 +817,10 @@
       let minY = Math.min(0, p.w * tan) - 20;
       let maxY = Math.max(p.h, p.w * tan + p.h) + 20;
       
-      let groundY = height - 40;
-      let altRatio = Math.max(0, Math.min(1, (groundY - p.y) / (15000 * PIXELS_PER_METER)));
-      let baseColor = getTowerBaseColorRGB(altRatio);
-      ctx.fillStyle = `rgb(${Math.floor(baseColor.r*0.4)}, ${Math.floor(baseColor.g*0.4)}, ${Math.floor(baseColor.b*0.4)})`;
+      let sideR = Math.floor(bR * 0.5);
+      let sideG = Math.floor(bG * 0.5);
+      let sideB = Math.floor(bB * 0.5);
+      ctx.fillStyle = `rgb(${sideR}, ${sideG}, ${sideB})`;
       ctx.fillRect(minX, minY, drawW, maxY - minY);
 
       ctx.transform(1, tan, 0, 1, 0, 0);
@@ -825,7 +849,18 @@
       
       let parapetH = 24;
       let bW = 20;
-      let cols = getPlatformColors(p.y);
+      let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
+      let tColor = getBaseTowerColor(altMeters);
+      let bR = Math.floor(tColor.r * 0.7);
+      let bG = Math.floor(tColor.g * 0.7);
+      let bB = Math.floor(tColor.b * 0.7);
+      let cols = [
+          `rgb(${bR}, ${bG}, ${bB})`,
+          `rgb(${Math.max(0, bR-10)}, ${Math.max(0, bG-10)}, ${Math.max(0, bB-10)})`,
+          `rgb(${Math.min(255, bR+10)}, ${Math.min(255, bG+10)}, ${Math.min(255, bB+10)})`,
+          `rgb(${Math.max(0, bR-20)}, ${Math.max(0, bG-20)}, ${Math.max(0, bB-20)})`,
+          `rgb(${Math.floor(bR*0.8)}, ${Math.floor(bG*0.8)}, ${Math.floor(bB*0.8)})`
+      ];
       let seed = p.x * 5.1 + p.y * 3.3;
       
       for (let x = 0; x < p.w; x += bW) {
@@ -847,7 +882,7 @@
               let drawY = -py - bh;
               ctx.fillRect(x + 1, drawY + 1, drawW - 2, bh - 2);
               
-              ctx.strokeStyle = '#222';
+              ctx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
               ctx.lineWidth = 2;
               ctx.strokeRect(x, drawY, drawW, bh);
           }
@@ -2264,200 +2299,116 @@
         let blockH = 64;
         let blockW = 128;
         let startY = Math.floor(drawTop / blockH) * blockH;
-        let centerX = towerLeft + towerWidth / 2;
         
-        // --------------------------------------------------
-        // 【1】塔レイヤー（ベースカラー ＋ 個別の石のランダムな色ムラ）
-        // --------------------------------------------------
-        for (let y = startY; y <= drawBottom; y += blockH) {
-            let rowIdx = Math.floor(y / blockH);
-            let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
-            
-            let altY = (groundY - y) / PIXELS_PER_METER;
-            let ratioY = Math.min(1, Math.max(0, altY / 15000));
-            let baseColor = getTowerBaseColorRGB(ratioY);
-
-            for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
-                let bx = x + offset;
-                if (bx + blockW > towerLeft && bx < towerRight) {
-                    let drawX = Math.max(towerLeft, bx);
-                    let drawW = Math.min(towerRight, bx + blockW) - drawX;
-                    
-                    // 円柱の陰影
-                    let blockCenterX = drawX + drawW / 2;
-                    let distFromCenter = Math.abs(blockCenterX - centerX) / (towerWidth / 2);
-                    let shade = 1.0 - Math.pow(distFromCenter, 1.5) * 0.6;
-                    
-                    // 個別の石ごとにランダムな色ムラ（0.85 〜 1.15倍）を追加してリアルな石積みを表現
-                    let colorVari = 0.85 + pRand(bx * 3.1 + y * 7.9) * 0.3;
-                    let finalShade = Math.max(0.1, Math.min(1.0, shade * colorVari));
-                    
-                    ctx.fillStyle = `rgb(${Math.floor(baseColor.r * finalShade)}, ${Math.floor(baseColor.g * finalShade)}, ${Math.floor(baseColor.b * finalShade)})`;
-                    ctx.fillRect(drawX, y, drawW, blockH);
-                }
-            }
-        }
-
-        // --------------------------------------------------
-        // 【2】目地レイヤー（ブロックの境界線）
-        // --------------------------------------------------
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
         ctx.lineWidth = 2;
+        
         for (let y = startY; y <= drawBottom; y += blockH) {
+            let altMeters = Math.max(0, (groundY - y) / PIXELS_PER_METER);
+            let baseColor = getBaseTowerColor(altMeters);
+            
             let rowIdx = Math.floor(y / blockH);
             let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
+            
             for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
                 let bx = x + offset;
-                if (bx + blockW > towerLeft && bx < towerRight) {
-                    let drawX = Math.max(towerLeft, bx);
-                    let drawW = Math.min(towerRight, bx + blockW) - drawX;
-                    ctx.strokeRect(drawX, y, drawW, blockH);
-                }
-            }
-        }
-
-        // --------------------------------------------------
-        // 【3】汚れレイヤー（目地の上に配置し、足場より奥に描画）
-        // --------------------------------------------------
-        for (let y = startY; y <= drawBottom; y += blockH) {
-            let rowIdx = Math.floor(y / blockH);
-            let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
-            
-            let altY = (groundY - y) / PIXELS_PER_METER;
-            let ratioY = Math.min(1, Math.max(0, altY / 15000));
-            let baseColor = getTowerBaseColorRGB(ratioY);
-            
-            let dirtAltY = (groundY - y);
-            let chunkGroup = Math.floor(dirtAltY / (3 * 100 * PIXELS_PER_METER)); 
-            let dRand = pRand(chunkGroup * 9.9);
-            
-            let dirtR = Math.floor(baseColor.r * (0.2 + dRand * 0.3));
-            let dirtG = Math.floor(baseColor.g * (0.2 + dRand * 0.3));
-            let dirtB = Math.floor(baseColor.b * (0.2 + dRand * 0.3));
-            let dirtOpacity = Math.max(0, 1.0 - (ratioY * 2.5));
-
-            if (dirtOpacity > 0) {
-                for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
-                    let bx = x + offset;
-                    if (bx + blockW > towerLeft && bx < towerRight) {
-                        let drawX = Math.max(towerLeft, bx);
-                        let drawW = Math.min(towerRight, bx + blockW) - drawX;
+                if (bx > towerRight || bx + blockW < towerLeft) continue;
+                
+                let drawX = Math.max(towerLeft, bx);
+                let drawW_block = Math.min(towerRight, bx + blockW) - drawX;
+                
+                ctx.fillStyle = getCylinderColor(baseColor, drawX, drawW_block, towerLeft, towerRight);
+                ctx.fillRect(drawX, y, drawW_block, blockH);
+                
+                let seed = bx * 13.1 + y * 97.3;
+                let altRatio = Math.max(0, Math.min(1, altMeters / 15000));
+                
+                let dirtProb = 0.8 * (1 - altRatio);
+                if (pRand(seed) < dirtProb) {
+                    let chunk3 = Math.floor(altMeters / 300);
+                    let rDist = pRand(chunk3 * 1.1) * 40 - 20;
+                    let gDist = pRand(chunk3 * 1.2) * 40 - 20;
+                    let bDist = pRand(chunk3 * 1.3) * 40 - 20;
+                    
+                    let dirtR = Math.max(0, baseColor.r - 40 + rDist);
+                    let dirtG = Math.max(0, baseColor.g - 40 + gDist);
+                    let dirtB = Math.max(0, baseColor.b - 40 + bDist);
+                    ctx.fillStyle = `rgba(${Math.floor(dirtR)}, ${Math.floor(dirtG)}, ${Math.floor(dirtB)}, 0.6)`;
+                    
+                    let spots = Math.floor(pRand(seed+1) * 5) + 2;
+                    for (let s=0; s<spots; s++) {
+                        let spotX = drawX + pRand(seed+2+s) * drawW_block;
+                        let isEdgeY = pRand(seed+3+s) < 0.5;
+                        let spotY = y + (pRand(seed+4+s) < 0.5 ? pRand(seed+5+s)*10 : blockH - pRand(seed+5+s)*10);
+                        if (!isEdgeY) {
+                            spotY = y + pRand(seed+6+s) * blockH;
+                            spotX = drawX + (pRand(seed+7+s) < 0.5 ? pRand(seed+8+s)*10 : drawW_block - pRand(seed+8+s)*10);
+                        }
                         
-                        let dirtSeed = bx * 7.1 + y * 13.7;
-                        if (pRand(dirtSeed) < 0.7) {
-                            ctx.fillStyle = `rgba(${dirtR}, ${dirtG}, ${dirtB}, ${dirtOpacity * 0.8})`;
-                            let dirtCount = Math.floor(pRand(dirtSeed + 1) * 4) + 1;
+                        let shapeType = Math.floor(pRand(seed+9+s) * 3);
+                        let sw = 4 + pRand(seed+10+s) * 12;
+                        let sh = 4 + pRand(seed+11+s) * 12;
+                        
+                        ctx.beginPath();
+                        if (shapeType === 0) {
+                            ctx.rect(spotX, spotY, sw, sh);
+                        } else if (shapeType === 1) {
+                            ctx.moveTo(spotX, spotY);
+                            ctx.lineTo(spotX + sw, spotY + sh);
+                            ctx.lineTo(spotX, spotY + sh);
+                        } else {
+                            ctx.moveTo(spotX + sw, spotY);
+                            ctx.lineTo(spotX + sw, spotY + sh);
+                            ctx.lineTo(spotX, spotY);
+                        }
+                        ctx.fill();
+                    }
+                }
+                
+                let mossProb = 0.1 + 0.7 * altRatio;
+                if (pRand(seed+100) < mossProb) {
+                    let isVine = pRand(seed+101) < 0.4;
+                    if (!isVine) {
+                        ctx.fillStyle = "rgba(45, 80, 40, 0.85)";
+                        let mossCount = Math.floor(pRand(seed+102) * 6) + 3;
+                        for(let i = 0; i < mossCount; i++) {
+                            let mx = drawX + pRand(seed+103+i) * drawW_block;
+                            let my = y + pRand(seed+104+i) * 20 - 5;
+                            let mw = 3 + pRand(seed+105+i) * 6;
+                            let mh = 3 + pRand(seed+106+i) * 6;
+                            ctx.fillRect(mx, my, mw, mh);
+                        }
+                    } else {
+                        ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
+                        let vineLen = Math.floor(pRand(seed+107) * 8) + 4;
+                        let curX = drawX + pRand(seed+108) * drawW_block;
+                        let curY = y;
+                        for(let v = 0; v < vineLen; v++) {
+                            ctx.fillRect(curX, curY, 3, 6);
+                            curY += 5;
+                            curX += (pRand(seed+109+v) - 0.5) * 8;
                             
-                            for (let i = 0; i < dirtCount; i++) {
-                                let shapeType = Math.floor(pRand(dirtSeed + 2 + i) * 3);
-                                let isEdgeX = pRand(dirtSeed + 3 + i) < 0.5;
-                                let isEdgeY = pRand(dirtSeed + 4 + i) < 0.5;
-                                
-                                let ox = isEdgeX ? (pRand(dirtSeed + 5 + i) * 20 - 10) : (pRand(dirtSeed + 5 + i) * drawW);
-                                let oy = isEdgeY ? (pRand(dirtSeed + 6 + i) * 20 - 10) : (pRand(dirtSeed + 6 + i) * blockH);
-                                
-                                let edgeBaseX = isEdgeX ? (pRand(dirtSeed+7+i)<0.5 ? drawX : drawX + drawW) : drawX;
-                                let edgeBaseY = isEdgeY ? (pRand(dirtSeed+8+i)<0.5 ? y : y + blockH) : y;
-                                
-                                let dx = edgeBaseX + (isEdgeX ? 0 : ox);
-                                let dy = edgeBaseY + (isEdgeY ? 0 : oy);
-                                
-                                dx = Math.max(towerLeft, Math.min(towerRight, dx));
-                                
-                                let sw = 4 + pRand(dirtSeed + 9 + i) * 12;
-                                let sh = 4 + pRand(dirtSeed + 10 + i) * 12;
-
+                            if (pRand(seed+110+v) < 0.7) {
+                                let leafSize = 4 + pRand(seed+111+v) * 5;
+                                let dir = pRand(seed+112+v) < 0.5 ? 1 : -1;
                                 ctx.beginPath();
-                                if (shapeType === 0) {
-                                    ctx.rect(dx - sw/2, dy - sh/2, sw, sh); 
-                                } else if (shapeType === 1) {
-                                    ctx.moveTo(dx, dy - sh/2);             
-                                    ctx.lineTo(dx + sw/2, dy + sh/2);
-                                    ctx.lineTo(dx - sw/2, dy + sh/2);
-                                } else {
-                                    ctx.moveTo(dx - sw/2, dy - sh/2);      
-                                    ctx.lineTo(dx + sw/2, dy - sh/2);
-                                    ctx.lineTo(dx, dy + sh/2);
-                                }
+                                ctx.moveTo(curX, curY);
+                                ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
+                                ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
                                 ctx.fill();
                             }
                         }
                     }
                 }
-            }
-        }
-
-        // --------------------------------------------------
-        // 【4】蔦・苔レイヤー（高度に応じて追加）
-        // --------------------------------------------------
-        for (let y = startY; y <= drawBottom; y += blockH) {
-            let rowIdx = Math.floor(y / blockH);
-            let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
-            
-            let altRatio = Math.max(0, Math.min(1, (groundY - y) / (15000 * PIXELS_PER_METER)));
-            let baseProb = 0.05 + 0.85 * altRatio; 
-
-            for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
-                let bx = x + offset;
-                if (bx > towerRight || bx + blockW < towerLeft) continue;
-
-                let seed = bx * 13.1 + y * 97.3;
-                let spots = 3; 
-                for(let s = 0; s < spots; s++) {
-                    let spotSeed = seed + s * 11.1;
-                    let r1 = pRand(spotSeed);
-                    
-                    let spotX = bx + r1 * blockW;
-                    if (spotX < towerLeft || spotX > towerRight) continue;
-
-                    let isShadow = false;
-                    for (let p of activePlatforms) {
-                        if (p.invisibleWall) continue;
-                        if (spotX > p.x && spotX < p.x + p.w) {
-                            if (p.y < y && p.y > y - blockH * 2.5) {
-                                isShadow = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    let prob = isShadow ? baseProb * 1.5 : baseProb;
-                    if (pRand(spotSeed + 1) < prob) {
-                        let isVine = pRand(spotSeed + 2) < 0.4;
-                        
-                        if (!isVine) {
-                            ctx.fillStyle = "rgba(45, 80, 40, 0.85)";
-                            let mossCount = Math.floor(pRand(spotSeed + 3) * 6) + 3;
-                            for(let i = 0; i < mossCount; i++) {
-                                let mx = spotX + (pRand(spotSeed + 4 + i) - 0.5) * 30;
-                                let my = y + pRand(spotSeed + 5 + i) * 20 - 5;
-                                let mw = 3 + pRand(spotSeed + 6 + i) * 6;
-                                let mh = 3 + pRand(spotSeed + 7 + i) * 6;
-                                ctx.fillRect(mx, my, mw, mh);
-                            }
-                        } else {
-                            ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
-                            let vineLen = Math.floor(pRand(spotSeed + 3) * 8) + 4;
-                            let curX = spotX;
-                            let curY = y;
-                            for(let v = 0; v < vineLen; v++) {
-                                ctx.fillRect(curX, curY, 3, 6);
-                                curY += 5;
-                                curX += (pRand(spotSeed + 10 + v) - 0.5) * 8;
-                                
-                                if (pRand(spotSeed + 20 + v) < 0.7) {
-                                    let leafSize = 4 + pRand(spotSeed + 30 + v) * 5;
-                                    let dir = pRand(spotSeed + 40 + v) < 0.5 ? 1 : -1;
-                                    ctx.beginPath();
-                                    ctx.moveTo(curX, curY);
-                                    ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
-                                    ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
-                                    ctx.fill();
-                                }
-                            }
-                        }
-                    }
+                
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+                ctx.beginPath();
+                ctx.moveTo(drawX, y + blockH);
+                ctx.lineTo(drawX + drawW_block, y + blockH);
+                if (bx + blockW <= towerRight && bx + blockW >= towerLeft) {
+                    ctx.moveTo(bx + blockW, y);
+                    ctx.lineTo(bx + blockW, y + blockH);
                 }
+                ctx.stroke();
             }
         }
     }
@@ -2490,30 +2441,27 @@
       ctx.fillText("！", sign.x, iconY);
     }
 
-    // --------------------------------------------------
-    // 【5】足場レイヤー（一番手前）
-    // --------------------------------------------------
     for (let p of activePlatforms) {
       if (p.invisibleWall) continue; 
 
       if (p.isGround) {
-          let cols = getPlatformColors(p.y);
           let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
           let endY = p.y + p.w * tan;
-          
-          let altRatio = Math.max(0, Math.min(1, ((height - 40) - p.y) / (15000 * PIXELS_PER_METER)));
-          let base = getTowerBaseColorRGB(altRatio);
-          let moss1 = `rgb(${Math.floor(base.r*0.5)}, ${Math.floor(base.g*0.8)}, ${Math.floor(base.b*0.4)})`;
-          let moss2 = `rgb(${Math.floor(base.r*0.6)}, ${Math.floor(base.g*0.9)}, ${Math.floor(base.b*0.5)})`;
+          let tColor = getBaseTowerColor(0);
+          let bR = Math.floor(tColor.r * 0.6);
+          let bG = Math.floor(tColor.g * 0.6);
+          let bB = Math.floor(tColor.b * 0.6);
+          let baseGroundStr = `rgb(${bR}, ${bG}, ${bB})`;
+          let darkGroundStr = `rgb(${Math.floor(bR*0.6)}, ${Math.floor(bG*0.6)}, ${Math.floor(bB*0.6)})`;
 
-          drawPlatformLayer(ctx, p, endY, 4, p.h, cols[4]); 
-          drawPlatformLayer(ctx, p, endY, 0, p.h, cols[0]); 
-          drawPlatformLayer(ctx, p, endY, 0, 10, moss1);  
-          drawPlatformLayer(ctx, p, endY, 0, 3, moss2);   
+          drawPlatformLayer(ctx, p, endY, 4, p.h, darkGroundStr); 
+          drawPlatformLayer(ctx, p, endY, 0, p.h, baseGroundStr); 
+          drawPlatformLayer(ctx, p, endY, 0, 10, '#689f38');  
+          drawPlatformLayer(ctx, p, endY, 0, 3, '#8bc34a');   
       } else {
           drawStonePlatform(ctx, p);
       }
-      
+
       if (p.chest && !p.chest.opened) {
           let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
           let cY = p.y + (p.chest.x - p.x) * tan;
