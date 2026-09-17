@@ -297,7 +297,7 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
-  // テストモードフラグ（falseにすると本番仕様が有効になります）
+  // テストモードフラグ（falseで本番仕様が有効になります）
   const IS_TEST_MODE = false; 
 
   const canvas = document.getElementById('gameCanvas');
@@ -340,6 +340,10 @@
   const STAGE_EXPAND = 64;
   const LIMIT_LEFT = -STAGE_EXPAND;
   const LIMIT_RIGHT = width + STAGE_EXPAND;
+
+  // 動的な地上位置の管理
+  let startGroundY = 0;
+  let startZeroAltY = 0;
 
   let isPlaying = false;
   let isPaused = false;
@@ -674,7 +678,7 @@
 
   const player = {
     x: width / 2,
-    y: height - 50,
+    y: 0,
     size: 32, 
     vx: 0,           
     vy: 0,
@@ -705,7 +709,7 @@
     highestYInAir: 0,
     
     jumpStartX: width / 2,
-    jumpStartY: height - 50,
+    jumpStartY: 0,
     lastJumpChargeTime: 0,
     isBigFalling: false,
     hasPlayedFallSound: false,
@@ -793,7 +797,7 @@
       ctx.clip();
       
       let bH = 10;
-      let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
+      let altMeters = Math.max(0, (startGroundY - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
       
       let bR = Math.floor(tColor.r * 0.4);
@@ -849,7 +853,7 @@
       
       let parapetH = 24;
       let bW = 20;
-      let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
+      let altMeters = Math.max(0, (startGroundY - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
       
       let bR = Math.floor(tColor.r * 0.4);
@@ -880,7 +884,8 @@
               let colIdx = Math.floor(pRand(s2) * cols.length);
               ctx.fillStyle = cols[colIdx];
               
-              let drawY = -py - bh;
+              // 1px下へずらして足場との隙間を埋める
+              let drawY = -py - bh + 1;
               ctx.fillRect(x + 1, drawY + 1, drawW - 2, bh - 2);
               
               ctx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
@@ -1054,7 +1059,7 @@
   }
 
   function getChunkIndexByY(y) {
-    let altMeters = Math.max(0, Math.floor((height - 100 - y) / PIXELS_PER_METER));
+    let altMeters = Math.max(0, Math.floor((startZeroAltY - y) / PIXELS_PER_METER));
     return Math.floor(altMeters / CHUNK_METERS);
   }
 
@@ -1080,10 +1085,10 @@
 
   function setupSigns() {
     initialSigns = [
-      { x: width * 0.15 - 20, y: height - 40, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
-      { x: width * 0.38 - 20, y: height - 40, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
-      { x: width * 0.62 + 20, y: height - 40, message: "💫 【キャリブレーション】\n空中にいない時に1秒間に3回連続タップで\n姿勢を基準にジャイロをリセットします。" },
-      { x: width * 0.85 + 20, y: height - 40, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！" }
+      { x: width * 0.15 - 20, y: startGroundY, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
+      { x: width * 0.38 - 20, y: startGroundY, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
+      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n空中にいない時に1秒間に3回連続タップで\n姿勢を基準にジャイロをリセットします。" },
+      { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！" }
     ];
   }
 
@@ -1141,7 +1146,7 @@
     }
     
     let y = baseY - gapY;
-    let baseSafetyY = (height - 100) - (nextSafetyLevel * CHUNK_HEIGHT_PX);
+    let baseSafetyY = startZeroAltY - (nextSafetyLevel * CHUNK_HEIGHT_PX);
     let triggerSafetyY = baseSafetyY + (5 * PIXELS_PER_METER); 
 
     if (!IS_TEST_MODE && y <= triggerSafetyY) {
@@ -1264,7 +1269,7 @@
                 
                 if (drawW >= 32 && !isTutorial) {
                     if (Math.random() < 0.08) {
-                        let altMeters = Math.max(0, Math.floor((height - 100 - drawY) / PIXELS_PER_METER));
+                        let altMeters = Math.max(0, Math.floor((startZeroAltY - drawY) / PIXELS_PER_METER));
                         pObj.chest = { type: getChestType(altMeters), x: drawLeft + drawW / 2, opened: false };
                     }
                 }
@@ -1323,13 +1328,14 @@
 
   function createInitialPlatforms() {
     chunks = {};
-    let ground = { x: LIMIT_LEFT, y: height - 40, w: LIMIT_RIGHT - LIMIT_LEFT, h: 40, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false, offsetLeft: 0, offsetRight: 0 };
+    // 高さを大幅に延長（3000px）して画面下部をすべて覆い尽くす
+    let ground = { x: LIMIT_LEFT, y: startGroundY, w: LIMIT_RIGHT - LIMIT_LEFT, h: 3000, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false, offsetLeft: 0, offsetRight: 0 };
     addPlatformToChunk(ground);
 
     generatedHighestPlatform = { 
-        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: height - 40, maxY: height }, 
-        leftTop: {x: LIMIT_LEFT, y: height - 40},
-        rightTop: {x: LIMIT_RIGHT, y: height - 40},
+        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: startGroundY, maxY: startGroundY + 3000 }, 
+        leftTop: {x: LIMIT_LEFT, y: startGroundY},
+        rightTop: {x: LIMIT_RIGHT, y: startGroundY},
         isSafety: true, 
         isGround: true 
     };
@@ -1343,7 +1349,7 @@
     for (let offset = -1; offset <= 1; offset++) {
       let targetIndex = currentChunkIndex + offset;
       
-      let chunkTopY = (height - 100) - (targetIndex + 1) * CHUNK_HEIGHT_PX;
+      let chunkTopY = startZeroAltY - (targetIndex + 1) * CHUNK_HEIGHT_PX;
       active.push({ x: LIMIT_LEFT - 96, y: chunkTopY, w: 96, h: CHUNK_HEIGHT_PX, isSafety: true, friction: 0, slope: 0, invisibleWall: true });
       active.push({ x: LIMIT_RIGHT, y: chunkTopY, w: 96, h: CHUNK_HEIGHT_PX, isSafety: true, friction: 0, slope: 0, invisibleWall: true });
 
@@ -1621,6 +1627,10 @@
         testModeUI.style.display = 'none';
     }
 
+    // カメラの追従ライン（height * 0.6）より少し下（+40px）に地上を設定
+    startGroundY = height * 0.65 + 40; 
+    startZeroAltY = startGroundY - 60; // 高度0mの基準線
+
     isPlaying = true;
     isPaused = false;
     isPressing = false;
@@ -1632,7 +1642,7 @@
     nextSafetyLevel = 1;
     
     player.x = width / 2;
-    player.y = height - 49.5; 
+    player.y = startGroundY - 9.5; 
     
     cameraY = player.y - height * 0.6;
     if (cameraY > 0) cameraY = 0;
@@ -1735,7 +1745,7 @@
         currentOpacity = 1;
         useCSSFade = true;
     } else {
-        if (player.y > height - 200) { 
+        if (player.y > startGroundY - 200) { 
             for (let sign of initialSigns) {
                 if (Math.abs(player.x - sign.x) < 25 && Math.abs(player.y - sign.y) < 50) {
                     activeMessage = sign.message;
@@ -1832,7 +1842,7 @@
           slipTilt = Math.sin(player.currentPlatform.slope * Math.PI / 180) * 60;
       }
 
-      let inTutorial = player.y > (height - 100) - CHUNK_HEIGHT_PX;
+      let inTutorial = player.y > startZeroAltY - CHUNK_HEIGHT_PX;
       let tiltMult = (inTutorial && !IS_TEST_MODE) ? 0.8 : 1.0;
       
       let activeTilt = effectiveTilt * tiltMult;
@@ -2198,7 +2208,7 @@
     targetCameraX = Math.max(-STAGE_EXPAND, Math.min(STAGE_EXPAND, targetCameraX));
     cameraX += (targetCameraX - cameraX) * 0.15;
 
-    let currentAlt = Math.max(0, Math.floor((height - 100 - player.y) / PIXELS_PER_METER));
+    let currentAlt = Math.max(0, Math.floor((startZeroAltY - player.y) / PIXELS_PER_METER));
     currentAltElement.innerText = currentAlt;
     
     if (currentAlt > bestScore) {
@@ -2264,7 +2274,7 @@
         }
 
         let logicalY = c.y + cameraY * (1 - PARALLAX_FACTOR_CLOUD);
-        let altMeters = (height - 40 - logicalY) / PIXELS_PER_METER;
+        let altMeters = (startGroundY - logicalY) / PIXELS_PER_METER;
         
         if (altMeters > 20) {
             let fade = Math.min(1, (altMeters - 20) / 10);
@@ -2288,7 +2298,7 @@
     let towerLeft = 48;
     let towerRight = width - 48;
     let towerWidth = towerRight - towerLeft;
-    let groundY = height - 40;
+    let groundY = startGroundY;
     let topY = groundY - 15000 * PIXELS_PER_METER;
 
     let screenTopY = cameraY;
@@ -2345,7 +2355,6 @@
                         let sw = 4 + pRand(seed+10+s) * 12;
                         let sh = 4 + pRand(seed+11+s) * 12;
                         
-                        // 塔の輪郭より2px以上外側にはみ出さないよう制限
                         if (spotX < towerLeft - 2) {
                             spotX = towerLeft - 2;
                         }
@@ -2383,7 +2392,6 @@
                             let mw = 3 + pRand(seed+105+i) * 6;
                             let mh = 3 + pRand(seed+106+i) * 6;
                             
-                            // 苔の2pxはみ出し制限
                             if (mx < towerLeft - 2) mx = towerLeft - 2;
                             if (mx + mw > towerRight + 2) mw = (towerRight + 2) - mx;
                             
@@ -2395,7 +2403,6 @@
                         let curX = drawX + pRand(seed+108) * drawW_block;
                         let curY = y;
                         for(let v = 0; v < vineLen; v++) {
-                            // ツルの2pxはみ出し制限
                             if (curX >= towerLeft - 2 && curX <= towerRight + 2) {
                                 ctx.fillRect(curX, curY, 3, 6);
                             }
@@ -2406,9 +2413,7 @@
                                 let leafSize = 4 + pRand(seed+111+v) * 5;
                                 let dir = pRand(seed+112+v) < 0.5 ? 1 : -1;
                                 
-                                // 葉っぱの2pxはみ出し制限
-                                if (curX >= towerLeft - 2 && curX <= towerRight + 2 &&
-                                    curX + (dir * leafSize) >= towerLeft - 2 && curX + (dir * leafSize) <= towerRight + 2) {
+                                if (curX >= towerLeft - 2 && curX + (dir * leafSize) <= towerRight + 2 && curX + (dir * leafSize) >= towerLeft - 2) {
                                     ctx.beginPath();
                                     ctx.moveTo(curX, curY);
                                     ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
