@@ -672,9 +672,6 @@
     wallHitDir: 0, 
     wallHitPlatform: null,
     wallHitType: 3, 
-    preHitVx: 0,  
-    preHitVy: 0,
-    isWallBouncing: false, 
     
     confusionEndTime: 0,
     hitStopCooldownEndTime: 0,
@@ -1595,9 +1592,6 @@
     player.highestYInAir = player.y;
     player.onGround = true; 
     player.currentPlatform = null;
-    player.preHitVx = 0;
-    player.preHitVy = 0;
-    player.isWallBouncing = false; 
     
     player.jumpStartX = player.x;
     player.jumpStartY = player.y;
@@ -1763,26 +1757,14 @@
       
       if (player.wallHitPlatform !== null && !player.isClimbing) {
           if (player.wallHitDir === 1 || player.wallHitDir === -1) {
-              if (player.wallHitType === 2) {
-                  
-                  player.airVx = 0;
-                  player.vx = 0;
-                  player.vy = 0;
-              } else {
-                  
-                  player.airVx = -player.preHitVx * 0.85;
-                  player.vx = player.airVx;
-                  player.vy = player.preHitVy * 0.85; 
-                  player.isWallBouncing = true;
-              }
+              // ユーザーの妥協案を採用：ディレイ終了後は無条件で真下へ落下
+              player.airVx = 0;
+              player.vx = 0;
+              player.vy = 0;
               player.onGround = false;
           }
           player.wallHitPlatform = null;
           player.wallHitDir = 0;
-      }
-
-      if (player.isWallBouncing && player.vy >= 0) {
-          player.isWallBouncing = false;
       }
 
       if (isNormalConfused || isBigFallConfused) {
@@ -1806,10 +1788,6 @@
       } else if (isNormalConfused) {
           let confMult = (inTutorial && !IS_TEST_MODE) ? 1.1 : 1.3;
           activeTilt = -effectiveTilt * confMult;
-      }
-
-      if (player.isWallBouncing) {
-          activeTilt = 0;
       }
 
       activeTilt += slipTilt;
@@ -2110,8 +2088,6 @@
               else if (cTopRatio <= 50) hType = 2;    
               else hType = 3;                         
 
-              let oldVx = player.vx;
-
               if (hitFromLeft) player.x = p.x - rMax;
               else player.x = (p.x + p.w) + rMax;
               
@@ -2132,9 +2108,6 @@
                       player.wallHitDir = hitFromLeft ? 1 : -1; 
                       player.wallHitType = hType;
                       player.wallHitPlatform = p;
-                      
-                      player.preHitVx = oldVx; 
-                      player.preHitVy = oldVy; 
                   }
               }
             }
