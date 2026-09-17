@@ -797,7 +797,7 @@
       ctx.clip();
       
       let bH = 10;
-      let altMeters = Math.max(0, (startGroundY - p.y) / PIXELS_PER_METER);
+      let altMeters = Math.max(0, (startZeroAltY - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
       
       let bR = Math.floor(tColor.r * 0.4);
@@ -853,7 +853,7 @@
       
       let parapetH = 24;
       let bW = 20;
-      let altMeters = Math.max(0, (startGroundY - p.y) / PIXELS_PER_METER);
+      let altMeters = Math.max(0, (startZeroAltY - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
       
       let bR = Math.floor(tColor.r * 0.4);
@@ -884,7 +884,6 @@
               let colIdx = Math.floor(pRand(s2) * cols.length);
               ctx.fillStyle = cols[colIdx];
               
-              // 1px下へずらして足場との隙間を埋める
               let drawY = -py - bh + 1;
               ctx.fillRect(x + 1, drawY + 1, drawW - 2, bh - 2);
               
@@ -1328,12 +1327,11 @@
 
   function createInitialPlatforms() {
     chunks = {};
-    // 高さを大幅に延長（3000px）して画面下部をすべて覆い尽くす
-    let ground = { x: LIMIT_LEFT, y: startGroundY, w: LIMIT_RIGHT - LIMIT_LEFT, h: 3000, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false, offsetLeft: 0, offsetRight: 0 };
+    let ground = { x: LIMIT_LEFT, y: startGroundY, w: LIMIT_RIGHT - LIMIT_LEFT, h: 1000, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false, offsetLeft: 0, offsetRight: 0 };
     addPlatformToChunk(ground);
 
     generatedHighestPlatform = { 
-        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: startGroundY, maxY: startGroundY + 3000 }, 
+        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: startGroundY, maxY: startGroundY + 1000 }, 
         leftTop: {x: LIMIT_LEFT, y: startGroundY},
         rightTop: {x: LIMIT_RIGHT, y: startGroundY},
         isSafety: true, 
@@ -1617,6 +1615,60 @@
     }, 1000);
   });
 
+  // 雑草を描画する関数
+  function drawWeeds(ctx, dp, seedOffset, color) {
+      let seed = 5678 + seedOffset;
+      // 6キャラ〜10キャラ分 = 192px 〜 320pxの合計幅
+      let totalWeedWidth = 192 + pRand(seed++) * 128;
+      
+      let patches = [];
+      let remaining = totalWeedWidth;
+      while (remaining > 0) {
+          let pw = 20 + pRand(seed++) * 40; 
+          if (pw > remaining) pw = remaining;
+          patches.push(pw);
+          remaining -= pw;
+      }
+      
+      // パッチ間の隙間を計算
+      let spacing = (dp.w - 32 - totalWeedWidth) / (patches.length + 1);
+      let px = dp.x + 16 + spacing;
+      
+      ctx.fillStyle = color;
+      
+      for (let pw of patches) {
+          let cx = px;
+          while (cx < px + pw) {
+              let h = 3 + pRand(seed++) * 13; // 3px 〜 16pxの高さ
+              let w = 2 + pRand(seed++) * 4;  // 幅
+              let slant = (pRand(seed++) - 0.5) * 10; // 傾き
+              let type = Math.floor(pRand(seed++) * 3);
+              
+              ctx.beginPath();
+              if (type === 0) { // 長方形
+                  ctx.moveTo(cx, dp.y);
+                  ctx.lineTo(cx + w, dp.y);
+                  ctx.lineTo(cx + w + slant, dp.y - h);
+                  ctx.lineTo(cx + slant, dp.y - h);
+              } else if (type === 1) { // 台形
+                  ctx.moveTo(cx, dp.y);
+                  ctx.lineTo(cx + w, dp.y);
+                  ctx.lineTo(cx + w/2 + slant + w/4, dp.y - h);
+                  ctx.lineTo(cx + w/2 + slant - w/4, dp.y - h);
+              } else { // 三角形
+                  ctx.moveTo(cx, dp.y);
+                  ctx.lineTo(cx + w, dp.y);
+                  ctx.lineTo(cx + w/2 + slant, dp.y - h);
+              }
+              ctx.closePath();
+              ctx.fill();
+              
+              cx += w * 0.5 + pRand(seed++) * 3;
+          }
+          px += pw + spacing;
+      }
+  }
+
   function startGameInit() {
     startScreen.style.display = 'none';
     uiLayer.style.display = 'block';
@@ -1628,8 +1680,8 @@
     }
 
     // カメラの追従ライン（height * 0.6）より少し下（+40px）に地上を設定
-    startGroundY = height * 0.65 + 40; 
-    startZeroAltY = startGroundY - 60; // 高度0mの基準線
+    startGroundY = height * 0.6 + 40; 
+    startZeroAltY = startGroundY - 40; // 高度0mの基準線
 
     isPlaying = true;
     isPaused = false;
@@ -2274,7 +2326,7 @@
         }
 
         let logicalY = c.y + cameraY * (1 - PARALLAX_FACTOR_CLOUD);
-        let altMeters = (startGroundY - logicalY) / PIXELS_PER_METER;
+        let altMeters = (startZeroAltY - logicalY) / PIXELS_PER_METER;
         
         if (altMeters > 20) {
             let fade = Math.min(1, (altMeters - 20) / 10);
@@ -2466,24 +2518,62 @@
       ctx.fillText("！", sign.x, iconY);
     }
 
+    // --- 背景層の足場・地面・奥の雑草レイヤー描画 ---
     for (let p of activePlatforms) {
       if (p.invisibleWall) continue; 
 
       if (p.isGround) {
-          let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
-          let endY = p.y + p.w * tan;
-          let tColor = getBaseTowerColor(0);
+          // 見えない壁の奥側までグラフィックを拡張（16px広げる）
+          let dp = {x: p.x - 16, y: p.y, w: p.w + 32, h: p.h, slope: 0};
+          let endY = dp.y;
           
-          let bR = Math.floor(tColor.r * 0.4);
-          let bG = Math.floor(tColor.g * 0.4);
-          let bB = Math.floor(tColor.b * 0.4);
-          let baseGroundStr = `rgb(${bR}, ${bG}, ${bB})`;
-          let darkGroundStr = `rgb(${Math.floor(bR*0.6)}, ${Math.floor(bG*0.6)}, ${Math.floor(bB*0.6)})`;
+          let darkGroundStr = '#3d2616'; // 濃い茶色
+          
+          // 地中の基本色
+          drawPlatformLayer(ctx, dp, endY, 10, dp.h - 10, darkGroundStr); 
+          
+          // 地中の小石など
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(dp.x, dp.y + 10, dp.w, dp.h - 10);
+          ctx.clip();
+          let stoneSeed = 888;
+          for (let i = 0; i < 500; i++) {
+               let sx = dp.x + pRand(stoneSeed++) * dp.w;
+               let sy = dp.y + 10 + pRand(stoneSeed++) * 990;
+               let size = 6 + pRand(stoneSeed++) * 14; 
+               let type = Math.floor(pRand(stoneSeed++) * 3);
+               let isDark = pRand(stoneSeed++) < 0.5;
+               
+               ctx.fillStyle = isDark ? '#2b1a0f' : '#4f321c'; 
+               
+               ctx.beginPath();
+               if (type === 0) { 
+                   let w = size;
+                   let h = size * (0.5 + pRand(stoneSeed++));
+                   ctx.rect(sx, sy, w, h);
+               } else if (type === 1) { 
+                   ctx.moveTo(sx, sy);
+                   ctx.lineTo(sx + size, sy + size);
+                   ctx.lineTo(sx, sy + size);
+               } else {
+                   ctx.moveTo(sx + size, sy);
+                   ctx.lineTo(sx + size, sy + size);
+                   ctx.lineTo(sx, sy);
+               }
+               ctx.fill();
+          }
+          ctx.restore();
 
-          drawPlatformLayer(ctx, p, endY, 4, p.h, darkGroundStr); 
-          drawPlatformLayer(ctx, p, endY, 0, p.h, baseGroundStr); 
-          drawPlatformLayer(ctx, p, endY, 0, 10, '#689f38');  
-          drawPlatformLayer(ctx, p, endY, 0, 3, '#8bc34a');   
+          // 地表の緑色（より濃い緑に変更）
+          let surfaceBase = '#2e7d32'; 
+          let surfaceTop = '#43a047';
+          drawPlatformLayer(ctx, dp, endY, 0, 10, surfaceBase);  
+          drawPlatformLayer(ctx, dp, endY, 0, 3, surfaceTop);   
+
+          // レイヤー1：奥の雑草（塔とキャラクターの間）
+          drawWeeds(ctx, dp, 100, '#4caf50');
+
       } else {
           drawStonePlatform(ctx, p);
       }
@@ -2662,11 +2752,20 @@
 
     ctx.restore();
 
+    // --- 手前レイヤー（キャラクターの前）の描画 ---
     ctx.save();
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
+        
+        // パラペット
         if (p.isSafety && !p.isGround) {
             drawParapet(ctx, p);
+        }
+        
+        // レイヤー2：手前の雑草（キャラクターの前）
+        if (p.isGround) {
+            let dp = {x: p.x - 16, y: p.y, w: p.w + 32, h: p.h, slope: 0};
+            drawWeeds(ctx, dp, 200, '#66bb6a'); // 色を少し明るく、シードをずらす
         }
     }
     ctx.restore();
