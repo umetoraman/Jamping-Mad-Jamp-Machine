@@ -399,7 +399,7 @@
       return h - Math.floor(h);
   }
 
-  // --- 塔の色の計算と円柱表現の追加 ---
+  // --- 塔の色計算 ---
   function getBaseTowerColor(altMeters) {
       let clampedAlt = Math.max(0, Math.min(8000, altMeters));
       let step = Math.floor(clampedAlt / 1000); 
@@ -410,21 +410,22 @@
       return {r: r, g: g, b: b};
   }
 
-  function getCylinderColor(baseColor, x, blockW, towerLeft, towerRight) {
+  function getCylinderColorRGB(baseColor, x, blockW, towerLeft, towerRight) {
       let center = (towerLeft + towerRight) / 2;
       let blockCenter = x + blockW / 2;
       blockCenter = Math.max(towerLeft, Math.min(towerRight, blockCenter));
       let dist = Math.abs(blockCenter - center);
       let maxDist = (towerRight - towerLeft) / 2;
       
+      // 端に行くほど暗くなる(最低で元の0.5倍)
       let factor = 1.0 - Math.pow(dist / maxDist, 2.0) * 0.5; 
       
       let r = Math.floor(baseColor.r * factor);
       let g = Math.floor(baseColor.g * factor);
       let b = Math.floor(baseColor.b * factor);
-      return `rgb(${r}, ${g}, ${b})`;
+      return {r: r, g: g, b: b};
   }
-  // ------------------------------------
+  // ------------------
 
   function saveData() {
       localStorage.setItem('jm_totalCoins', totalCoins);
@@ -796,9 +797,11 @@
       let bH = 10;
       let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
-      let bR = Math.floor(tColor.r * 0.7);
-      let bG = Math.floor(tColor.g * 0.7);
-      let bB = Math.floor(tColor.b * 0.7);
+      
+      // 足場の色は塔のベースカラーの40% (塔の影の一番濃い部分は50%なのでそれより濃い)
+      let bR = Math.floor(tColor.r * 0.4);
+      let bG = Math.floor(tColor.g * 0.4);
+      let bB = Math.floor(tColor.b * 0.4);
       
       let cols = [
           `rgb(${bR}, ${bG}, ${bB})`,
@@ -851,9 +854,11 @@
       let bW = 20;
       let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
-      let bR = Math.floor(tColor.r * 0.7);
-      let bG = Math.floor(tColor.g * 0.7);
-      let bB = Math.floor(tColor.b * 0.7);
+      
+      // 足場の色は塔のベースカラーの40%
+      let bR = Math.floor(tColor.r * 0.4);
+      let bG = Math.floor(tColor.g * 0.4);
+      let bB = Math.floor(tColor.b * 0.4);
       let cols = [
           `rgb(${bR}, ${bG}, ${bB})`,
           `rgb(${Math.max(0, bR-10)}, ${Math.max(0, bG-10)}, ${Math.max(0, bB-10)})`,
@@ -2316,23 +2321,22 @@
                 let drawX = Math.max(towerLeft, bx);
                 let drawW_block = Math.min(towerRight, bx + blockW) - drawX;
                 
-                ctx.fillStyle = getCylinderColor(baseColor, drawX, drawW_block, towerLeft, towerRight);
+                // ブロックの基本色を計算して描画
+                let blockColorObj = getCylinderColorRGB(baseColor, drawX, drawW_block, towerLeft, towerRight);
+                ctx.fillStyle = `rgb(${blockColorObj.r}, ${blockColorObj.g}, ${blockColorObj.b})`;
                 ctx.fillRect(drawX, y, drawW_block, blockH);
                 
                 let seed = bx * 13.1 + y * 97.3;
                 let altRatio = Math.max(0, Math.min(1, altMeters / 15000));
                 
+                // 汚れ・傷の描画
                 let dirtProb = 0.8 * (1 - altRatio);
                 if (pRand(seed) < dirtProb) {
-                    let chunk3 = Math.floor(altMeters / 300);
-                    let rDist = pRand(chunk3 * 1.1) * 40 - 20;
-                    let gDist = pRand(chunk3 * 1.2) * 40 - 20;
-                    let bDist = pRand(chunk3 * 1.3) * 40 - 20;
-                    
-                    let dirtR = Math.max(0, baseColor.r - 40 + rDist);
-                    let dirtG = Math.max(0, baseColor.g - 40 + gDist);
-                    let dirtB = Math.max(0, baseColor.b - 40 + bDist);
-                    ctx.fillStyle = `rgba(${Math.floor(dirtR)}, ${Math.floor(dirtG)}, ${Math.floor(dirtB)}, 0.6)`;
+                    // 対象ブロックより少し濃い色（暗い色）を設定
+                    let dirtR = Math.max(0, blockColorObj.r - 40);
+                    let dirtG = Math.max(0, blockColorObj.g - 40);
+                    let dirtB = Math.max(0, blockColorObj.b - 40);
+                    ctx.fillStyle = `rgba(${dirtR}, ${dirtG}, ${dirtB}, 0.8)`;
                     
                     let spots = Math.floor(pRand(seed+1) * 5) + 2;
                     for (let s=0; s<spots; s++) {
@@ -2348,19 +2352,29 @@
                         let sw = 4 + pRand(seed+10+s) * 12;
                         let sh = 4 + pRand(seed+11+s) * 12;
                         
-                        ctx.beginPath();
-                        if (shapeType === 0) {
-                            ctx.rect(spotX, spotY, sw, sh);
-                        } else if (shapeType === 1) {
-                            ctx.moveTo(spotX, spotY);
-                            ctx.lineTo(spotX + sw, spotY + sh);
-                            ctx.lineTo(spotX, spotY + sh);
-                        } else {
-                            ctx.moveTo(spotX + sw, spotY);
-                            ctx.lineTo(spotX + sw, spotY + sh);
-                            ctx.lineTo(spotX, spotY);
+                        // 塔の左右端から3px以上外側にはみ出さないよう制限(クランプ)
+                        if (spotX < towerLeft - 3) {
+                            spotX = towerLeft - 3;
                         }
-                        ctx.fill();
+                        if (spotX + sw > towerRight + 3) {
+                            sw = (towerRight + 3) - spotX;
+                        }
+                        
+                        if (sw > 0) {
+                            ctx.beginPath();
+                            if (shapeType === 0) {
+                                ctx.rect(spotX, spotY, sw, sh);
+                            } else if (shapeType === 1) {
+                                ctx.moveTo(spotX, spotY);
+                                ctx.lineTo(spotX + sw, spotY + sh);
+                                ctx.lineTo(spotX, spotY + sh);
+                            } else {
+                                ctx.moveTo(spotX + sw, spotY);
+                                ctx.lineTo(spotX + sw, spotY + sh);
+                                ctx.lineTo(spotX, spotY);
+                            }
+                            ctx.fill();
+                        }
                     }
                 }
                 
@@ -2375,7 +2389,12 @@
                             let my = y + pRand(seed+104+i) * 20 - 5;
                             let mw = 3 + pRand(seed+105+i) * 6;
                             let mh = 3 + pRand(seed+106+i) * 6;
-                            ctx.fillRect(mx, my, mw, mh);
+                            
+                            // 苔も念のため制限
+                            if (mx < towerLeft - 3) mx = towerLeft - 3;
+                            if (mx + mw > towerRight + 3) mw = (towerRight + 3) - mx;
+                            
+                            if (mw > 0) ctx.fillRect(mx, my, mw, mh);
                         }
                     } else {
                         ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
@@ -2383,18 +2402,23 @@
                         let curX = drawX + pRand(seed+108) * drawW_block;
                         let curY = y;
                         for(let v = 0; v < vineLen; v++) {
-                            ctx.fillRect(curX, curY, 3, 6);
+                            if (curX >= towerLeft - 3 && curX <= towerRight + 3) {
+                                ctx.fillRect(curX, curY, 3, 6);
+                            }
                             curY += 5;
                             curX += (pRand(seed+109+v) - 0.5) * 8;
                             
                             if (pRand(seed+110+v) < 0.7) {
                                 let leafSize = 4 + pRand(seed+111+v) * 5;
                                 let dir = pRand(seed+112+v) < 0.5 ? 1 : -1;
-                                ctx.beginPath();
-                                ctx.moveTo(curX, curY);
-                                ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
-                                ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
-                                ctx.fill();
+                                
+                                if (curX >= towerLeft - 3 && curX + (dir * leafSize) <= towerRight + 3 && curX + (dir * leafSize) >= towerLeft - 3) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(curX, curY);
+                                    ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
+                                    ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
+                                    ctx.fill();
+                                }
                             }
                         }
                     }
@@ -2448,9 +2472,11 @@
           let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
           let endY = p.y + p.w * tan;
           let tColor = getBaseTowerColor(0);
-          let bR = Math.floor(tColor.r * 0.6);
-          let bG = Math.floor(tColor.g * 0.6);
-          let bB = Math.floor(tColor.b * 0.6);
+          
+          // 地面のベースも40%に設定
+          let bR = Math.floor(tColor.r * 0.4);
+          let bG = Math.floor(tColor.g * 0.4);
+          let bB = Math.floor(tColor.b * 0.4);
           let baseGroundStr = `rgb(${bR}, ${bG}, ${bB})`;
           let darkGroundStr = `rgb(${Math.floor(bR*0.6)}, ${Math.floor(bG*0.6)}, ${Math.floor(bB*0.6)})`;
 
