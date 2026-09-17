@@ -297,7 +297,7 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
-  const IS_TEST_MODE = false; 
+  const IS_TEST_MODE = true; 
 
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
@@ -739,6 +739,22 @@
       return { beta: beta * rad2deg, gamma: gamma * rad2deg };
   }
 
+  function getTowerBaseColorRGB(ratio) {
+      let r = Math.floor(200 * (1 - ratio) + 30 * ratio);
+      let g = Math.floor(200 * (1 - ratio) + 30 * ratio);
+      let b = Math.floor(200 * (1 - ratio) + 32 * ratio);
+      return {r, g, b};
+  }
+
+  function getPlatformColors(y) {
+      let groundY = height - 40;
+      let altRatio = Math.max(0, Math.min(1, (groundY - y) / (15000 * PIXELS_PER_METER)));
+      let base = getTowerBaseColorRGB(altRatio);
+      
+      let mul = [0.6, 0.7, 0.8, 0.9, 0.5];
+      return mul.map(m => `rgb(${Math.floor(base.r * m)}, ${Math.floor(base.g * m)}, ${Math.floor(base.b * m)})`);
+  }
+
   function drawPlatformLayer(ctx, p, endY, yOffset, thickness, color) {
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -767,7 +783,7 @@
       ctx.clip();
       
       let bH = 10;
-      let cols = ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#646464', '#2a2a2a'];
+      let cols = getPlatformColors(p.y);
       let seed = p.x * 1.3 + p.y * 2.7;
       
       let minX = Math.min(0, oL, p.w, p.w + oR) - 20;
@@ -777,7 +793,10 @@
       let minY = Math.min(0, p.w * tan) - 20;
       let maxY = Math.max(p.h, p.w * tan + p.h) + 20;
       
-      ctx.fillStyle = '#222';
+      let groundY = height - 40;
+      let altRatio = Math.max(0, Math.min(1, (groundY - p.y) / (15000 * PIXELS_PER_METER)));
+      let baseColor = getTowerBaseColorRGB(altRatio);
+      ctx.fillStyle = `rgb(${Math.floor(baseColor.r*0.4)}, ${Math.floor(baseColor.g*0.4)}, ${Math.floor(baseColor.b*0.4)})`;
       ctx.fillRect(minX, minY, drawW, maxY - minY);
 
       ctx.transform(1, tan, 0, 1, 0, 0);
@@ -806,7 +825,7 @@
       
       let parapetH = 24;
       let bW = 20;
-      let cols = ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#646464', '#2a2a2a'];
+      let cols = getPlatformColors(p.y);
       let seed = p.x * 5.1 + p.y * 3.3;
       
       for (let x = 0; x < p.w; x += bW) {
@@ -1757,7 +1776,6 @@
       
       if (player.wallHitPlatform !== null && !player.isClimbing) {
           if (player.wallHitDir === 1 || player.wallHitDir === -1) {
-              // ユーザーの妥協案を採用：ディレイ終了後は無条件で真下へ落下
               player.airVx = 0;
               player.vx = 0;
               player.vy = 0;
@@ -2249,112 +2267,163 @@
         let ratioTop = Math.min(1, Math.max(0, altTop / 15000));
         let ratioBottom = Math.min(1, Math.max(0, altBottom / 15000));
         
-        function getTowerColor(ratio) {
-            let r = Math.floor(200 * (1 - ratio) + 30 * ratio);
-            let g = Math.floor(200 * (1 - ratio) + 30 * ratio);
-            let b = Math.floor(200 * (1 - ratio) + 32 * ratio);
-            return `rgb(${r}, ${g}, ${b})`;
-        }
+        let tColTop = getTowerBaseColorRGB(ratioTop);
+        let tColBot = getTowerBaseColorRGB(ratioBottom);
         
         let grad = ctx.createLinearGradient(0, drawTop, 0, drawBottom);
-        grad.addColorStop(0, getTowerColor(ratioTop));
-        grad.addColorStop(1, getTowerColor(ratioBottom));
-        
+        grad.addColorStop(0, `rgb(${tColTop.r}, ${tColTop.g}, ${tColTop.b})`);
+        grad.addColorStop(1, `rgb(${tColBot.r}, ${tColBot.g}, ${tColBot.b})`);
         ctx.fillStyle = grad;
         ctx.fillRect(towerLeft, drawTop, towerWidth, drawBottom - drawTop);
         
         let blockH = 64;
         let blockW = 128;
         let startY = Math.floor(drawTop / blockH) * blockH;
+        let centerX = towerLeft + towerWidth / 2;
         
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
         for (let y = startY; y <= drawBottom; y += blockH) {
-            ctx.moveTo(towerLeft, y);
-            ctx.lineTo(towerRight, y);
-            
             let rowIdx = Math.floor(y / blockH);
             let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
+            
+            let altY = (groundY - y) / PIXELS_PER_METER;
+            let ratioY = Math.min(1, Math.max(0, altY / 15000));
+            let baseColor = getTowerBaseColorRGB(ratioY);
+            
+            let dirtAltY = (groundY - y);
+            let chunkGroup = Math.floor(dirtAltY / (3 * 100 * PIXELS_PER_METER)); 
+            let dRand = pRand(chunkGroup * 9.9);
+            let dirtR = Math.floor(baseColor.r * (0.3 + dRand * 0.4));
+            let dirtG = Math.floor(baseColor.g * (0.3 + dRand * 0.4));
+            let dirtB = Math.floor(baseColor.b * (0.3 + dRand * 0.4));
+            let dirtOpacity = Math.max(0, 1.0 - (ratioY * 2.5));
+
             for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
                 let bx = x + offset;
-                if (bx >= towerLeft && bx <= towerRight) {
-                    ctx.moveTo(bx, y);
-                    ctx.lineTo(bx, y + blockH);
+                if (bx + blockW > towerLeft && bx < towerRight) {
+                    let drawX = Math.max(towerLeft, bx);
+                    let drawW = Math.min(towerRight, bx + blockW) - drawX;
+                    
+                    let blockCenterX = drawX + drawW / 2;
+                    let distFromCenter = Math.abs(blockCenterX - centerX) / (towerWidth / 2);
+                    let shade = 1.0 - Math.pow(distFromCenter, 1.5) * 0.6;
+                    let noise = (pRand(bx * 1.3 + y * 2.7) - 0.5) * 0.1;
+                    let finalShade = Math.max(0.2, Math.min(1.0, shade + noise));
+                    
+                    ctx.fillStyle = `rgb(${Math.floor(baseColor.r * finalShade)}, ${Math.floor(baseColor.g * finalShade)}, ${Math.floor(baseColor.b * finalShade)})`;
+                    ctx.fillRect(drawX, y, drawW, blockH);
+
+                    if (dirtOpacity > 0) {
+                        let dirtSeed = bx * 7.1 + y * 13.7;
+                        if (pRand(dirtSeed) < 0.7) {
+                            ctx.fillStyle = `rgba(${dirtR}, ${dirtG}, ${dirtB}, ${dirtOpacity * 0.75})`;
+                            let dirtCount = Math.floor(pRand(dirtSeed + 1) * 4) + 1;
+                            
+                            for (let i = 0; i < dirtCount; i++) {
+                                let shapeType = Math.floor(pRand(dirtSeed + 2 + i) * 3);
+                                let isEdgeX = pRand(dirtSeed + 3 + i) < 0.5;
+                                let isEdgeY = pRand(dirtSeed + 4 + i) < 0.5;
+                                
+                                let ox = isEdgeX ? (pRand(dirtSeed + 5 + i) * 20 - 10) : (pRand(dirtSeed + 5 + i) * drawW);
+                                let oy = isEdgeY ? (pRand(dirtSeed + 6 + i) * 20 - 10) : (pRand(dirtSeed + 6 + i) * blockH);
+                                
+                                let edgeBaseX = isEdgeX ? (pRand(dirtSeed+7+i)<0.5 ? drawX : drawX + drawW) : drawX;
+                                let edgeBaseY = isEdgeY ? (pRand(dirtSeed+8+i)<0.5 ? y : y + blockH) : y;
+                                
+                                let dx = edgeBaseX + (isEdgeX ? 0 : ox);
+                                let dy = edgeBaseY + (isEdgeY ? 0 : oy);
+                                
+                                dx = Math.max(towerLeft, Math.min(towerRight, dx));
+                                
+                                let sw = 4 + pRand(dirtSeed + 9 + i) * 12;
+                                let sh = 4 + pRand(dirtSeed + 10 + i) * 12;
+
+                                ctx.beginPath();
+                                if (shapeType === 0) {
+                                    ctx.rect(dx - sw/2, dy - sh/2, sw, sh); 
+                                } else if (shapeType === 1) {
+                                    ctx.moveTo(dx, dy - sh/2);             
+                                    ctx.lineTo(dx + sw/2, dy + sh/2);
+                                    ctx.lineTo(dx - sw/2, dy + sh/2);
+                                } else {
+                                    ctx.moveTo(dx - sw/2, dy - sh/2);      
+                                    ctx.lineTo(dx + sw/2, dy - sh/2);
+                                    ctx.lineTo(dx, dy + sh/2);
+                                }
+                                ctx.fill();
+                            }
+                        }
+                    }
+                    
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(drawX, y, drawW, blockH);
                 }
             }
         }
-        ctx.stroke();
 
-        let mossLimitY = groundY - 5000 * PIXELS_PER_METER;
-        if (drawBottom > mossLimitY) {
-            let mossStart = Math.max(drawTop, mossLimitY);
-            let startY_moss = Math.floor(mossStart / blockH) * blockH;
+        for (let y = startY; y <= drawBottom; y += blockH) {
+            let rowIdx = Math.floor(y / blockH);
+            let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
+            
+            let altRatio = Math.max(0, Math.min(1, (groundY - y) / (15000 * PIXELS_PER_METER)));
+            let baseProb = 0.05 + 0.85 * altRatio; 
 
-            for (let y = startY_moss; y <= drawBottom; y += blockH) {
-                let rowIdx = Math.floor(y / blockH);
-                let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
-                
-                let altRatio = Math.max(0, Math.min(1, (groundY - y) / (5000 * PIXELS_PER_METER)));
-                let baseProb = 0.05 + 0.55 * altRatio;
+            for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
+                let bx = x + offset;
+                if (bx > towerRight || bx + blockW < towerLeft) continue;
 
-                for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
-                    let bx = x + offset;
-                    if (bx > towerRight || bx + blockW < towerLeft) continue;
+                let seed = bx * 13.1 + y * 97.3;
+                let spots = 3; 
+                for(let s = 0; s < spots; s++) {
+                    let spotSeed = seed + s * 11.1;
+                    let r1 = pRand(spotSeed);
+                    
+                    let spotX = bx + r1 * blockW;
+                    if (spotX < towerLeft || spotX > towerRight) continue;
 
-                    let seed = bx * 13.1 + y * 97.3;
-                    let spots = 3; 
-                    for(let s = 0; s < spots; s++) {
-                        let spotSeed = seed + s * 11.1;
-                        let r1 = pRand(spotSeed);
-                        
-                        let spotX = bx + r1 * blockW;
-                        if (spotX < towerLeft || spotX > towerRight) continue;
-
-                        let isShadow = false;
-                        for (let p of activePlatforms) {
-                            if (p.invisibleWall) continue;
-                            if (spotX > p.x && spotX < p.x + p.w) {
-                                if (p.y < y && p.y > y - blockH * 2.5) {
-                                    isShadow = true;
-                                    break;
-                                }
+                    let isShadow = false;
+                    for (let p of activePlatforms) {
+                        if (p.invisibleWall) continue;
+                        if (spotX > p.x && spotX < p.x + p.w) {
+                            if (p.y < y && p.y > y - blockH * 2.5) {
+                                isShadow = true;
+                                break;
                             }
                         }
+                    }
 
-                        let prob = isShadow ? baseProb * 1.5 : baseProb;
-                        if (pRand(spotSeed + 1) < prob) {
-                            let isVine = pRand(spotSeed + 2) < 0.4;
-                            
-                            if (!isVine) {
-                                ctx.fillStyle = "rgba(45, 80, 40, 0.85)";
-                                let mossCount = Math.floor(pRand(spotSeed + 3) * 6) + 3;
-                                for(let i = 0; i < mossCount; i++) {
-                                    let mx = spotX + (pRand(spotSeed + 4 + i) - 0.5) * 30;
-                                    let my = y + pRand(spotSeed + 5 + i) * 20 - 5;
-                                    let mw = 3 + pRand(spotSeed + 6 + i) * 6;
-                                    let mh = 3 + pRand(spotSeed + 7 + i) * 6;
-                                    ctx.fillRect(mx, my, mw, mh);
-                                }
-                            } else {
-                                ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
-                                let vineLen = Math.floor(pRand(spotSeed + 3) * 8) + 4;
-                                let curX = spotX;
-                                let curY = y;
-                                for(let v = 0; v < vineLen; v++) {
-                                    ctx.fillRect(curX, curY, 3, 6);
-                                    curY += 5;
-                                    curX += (pRand(spotSeed + 10 + v) - 0.5) * 8;
-                                    
-                                    if (pRand(spotSeed + 20 + v) < 0.7) {
-                                        let leafSize = 4 + pRand(spotSeed + 30 + v) * 5;
-                                        let dir = pRand(spotSeed + 40 + v) < 0.5 ? 1 : -1;
-                                        ctx.beginPath();
-                                        ctx.moveTo(curX, curY);
-                                        ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
-                                        ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
-                                        ctx.fill();
-                                    }
+                    let prob = isShadow ? baseProb * 1.5 : baseProb;
+                    if (pRand(spotSeed + 1) < prob) {
+                        let isVine = pRand(spotSeed + 2) < 0.4;
+                        
+                        if (!isVine) {
+                            ctx.fillStyle = "rgba(45, 80, 40, 0.85)";
+                            let mossCount = Math.floor(pRand(spotSeed + 3) * 6) + 3;
+                            for(let i = 0; i < mossCount; i++) {
+                                let mx = spotX + (pRand(spotSeed + 4 + i) - 0.5) * 30;
+                                let my = y + pRand(spotSeed + 5 + i) * 20 - 5;
+                                let mw = 3 + pRand(spotSeed + 6 + i) * 6;
+                                let mh = 3 + pRand(spotSeed + 7 + i) * 6;
+                                ctx.fillRect(mx, my, mw, mh);
+                            }
+                        } else {
+                            ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
+                            let vineLen = Math.floor(pRand(spotSeed + 3) * 8) + 4;
+                            let curX = spotX;
+                            let curY = y;
+                            for(let v = 0; v < vineLen; v++) {
+                                ctx.fillRect(curX, curY, 3, 6);
+                                curY += 5;
+                                curX += (pRand(spotSeed + 10 + v) - 0.5) * 8;
+                                
+                                if (pRand(spotSeed + 20 + v) < 0.7) {
+                                    let leafSize = 4 + pRand(spotSeed + 30 + v) * 5;
+                                    let dir = pRand(spotSeed + 40 + v) < 0.5 ? 1 : -1;
+                                    ctx.beginPath();
+                                    ctx.moveTo(curX, curY);
+                                    ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
+                                    ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
+                                    ctx.fill();
                                 }
                             }
                         }
@@ -2396,16 +2465,23 @@
       if (p.invisibleWall) continue; 
 
       if (p.isGround) {
+          let cols = getPlatformColors(p.y);
           let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
           let endY = p.y + p.w * tan;
-          drawPlatformLayer(ctx, p, endY, 4, p.h, '#3e2723'); 
-          drawPlatformLayer(ctx, p, endY, 0, p.h, '#5d4037'); 
-          drawPlatformLayer(ctx, p, endY, 0, 10, '#689f38');  
-          drawPlatformLayer(ctx, p, endY, 0, 3, '#8bc34a');   
+          
+          let altRatio = Math.max(0, Math.min(1, ((height - 40) - p.y) / (15000 * PIXELS_PER_METER)));
+          let base = getTowerBaseColorRGB(altRatio);
+          let moss1 = `rgb(${Math.floor(base.r*0.5)}, ${Math.floor(base.g*0.8)}, ${Math.floor(base.b*0.4)})`;
+          let moss2 = `rgb(${Math.floor(base.r*0.6)}, ${Math.floor(base.g*0.9)}, ${Math.floor(base.b*0.5)})`;
+
+          drawPlatformLayer(ctx, p, endY, 4, p.h, cols[4]); 
+          drawPlatformLayer(ctx, p, endY, 0, p.h, cols[0]); 
+          drawPlatformLayer(ctx, p, endY, 0, 10, moss1);  
+          drawPlatformLayer(ctx, p, endY, 0, 3, moss2);   
       } else {
           drawStonePlatform(ctx, p);
       }
-
+      
       if (p.chest && !p.chest.opened) {
           let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
           let cY = p.y + (p.chest.x - p.x) * tan;
