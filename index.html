@@ -1941,6 +1941,7 @@
 
       for (let p of activePlatforms) {
         if (p.invisibleWall) continue; 
+        if (hitStopEndTime > now) break; // 【追加】ディレイが発生した瞬間に他の当たり判定処理を強制終了しゼロ化する
 
         let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
         
@@ -1992,8 +1993,8 @@
                 if (wasOnGround && player.vy >= -2) {
                     hitFromAbove = true;
                 } else if (hitFromLeft || hitFromRight) {
-                    // 【修正】横からの侵入の場合、前回下端が上辺より明確に上にあった時のみ着地扱い
-                    if (oBottom <= oldSurfaceY + 4) {
+                    // 【修正】横からの激突時は、完全に上から落ちてきた場合のみ着地とみなす（許容範囲+1pxに厳格化）
+                    if (oBottom <= oldSurfaceY + 1) {
                         hitFromAbove = true;
                     }
                 } else {
