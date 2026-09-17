@@ -1327,11 +1327,11 @@
 
   function createInitialPlatforms() {
     chunks = {};
-    let ground = { x: LIMIT_LEFT, y: startGroundY, w: LIMIT_RIGHT - LIMIT_LEFT, h: 1000, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false, offsetLeft: 0, offsetRight: 0 };
+    let ground = { x: LIMIT_LEFT, y: startGroundY, w: LIMIT_RIGHT - LIMIT_LEFT, h: 400, isSafety: true, isGround: true, friction: 85, slope: 0, isLeftConnected: false, isRightConnected: false, offsetLeft: 0, offsetRight: 0 };
     addPlatformToChunk(ground);
 
     generatedHighestPlatform = { 
-        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: startGroundY, maxY: startGroundY + 1000 }, 
+        aabb: { minX: LIMIT_LEFT, maxX: LIMIT_RIGHT, minY: startGroundY, maxY: startGroundY + 400 }, 
         leftTop: {x: LIMIT_LEFT, y: startGroundY},
         rightTop: {x: LIMIT_RIGHT, y: startGroundY},
         isSafety: true, 
@@ -1615,11 +1615,11 @@
     }, 1000);
   });
 
-  // 雑草を描画する関数
-  function drawWeeds(ctx, dp, seedOffset, color) {
+  function drawWeeds(ctx, dp, seedOffset, color, minChars, maxChars, offsetY) {
       let seed = 5678 + seedOffset;
-      // 6キャラ〜10キャラ分 = 192px 〜 320pxの合計幅
-      let totalWeedWidth = 192 + pRand(seed++) * 128;
+      let minW = minChars * 32;
+      let maxW = maxChars * 32;
+      let totalWeedWidth = minW + pRand(seed++) * (maxW - minW);
       
       let patches = [];
       let remaining = totalWeedWidth;
@@ -1630,35 +1630,35 @@
           remaining -= pw;
       }
       
-      // パッチ間の隙間を計算
       let spacing = (dp.w - 32 - totalWeedWidth) / (patches.length + 1);
       let px = dp.x + 16 + spacing;
       
       ctx.fillStyle = color;
+      let baseY = dp.y + offsetY; // 位置を調整して隙間をなくす
       
       for (let pw of patches) {
           let cx = px;
           while (cx < px + pw) {
-              let h = 3 + pRand(seed++) * 13; // 3px 〜 16pxの高さ
-              let w = 2 + pRand(seed++) * 4;  // 幅
-              let slant = (pRand(seed++) - 0.5) * 10; // 傾き
+              let h = 3 + pRand(seed++) * 13; 
+              let w = 2 + pRand(seed++) * 4;  
+              let slant = (pRand(seed++) - 0.5) * 10; 
               let type = Math.floor(pRand(seed++) * 3);
               
               ctx.beginPath();
-              if (type === 0) { // 長方形
-                  ctx.moveTo(cx, dp.y);
-                  ctx.lineTo(cx + w, dp.y);
-                  ctx.lineTo(cx + w + slant, dp.y - h);
-                  ctx.lineTo(cx + slant, dp.y - h);
-              } else if (type === 1) { // 台形
-                  ctx.moveTo(cx, dp.y);
-                  ctx.lineTo(cx + w, dp.y);
-                  ctx.lineTo(cx + w/2 + slant + w/4, dp.y - h);
-                  ctx.lineTo(cx + w/2 + slant - w/4, dp.y - h);
-              } else { // 三角形
-                  ctx.moveTo(cx, dp.y);
-                  ctx.lineTo(cx + w, dp.y);
-                  ctx.lineTo(cx + w/2 + slant, dp.y - h);
+              if (type === 0) { 
+                  ctx.moveTo(cx, baseY);
+                  ctx.lineTo(cx + w, baseY);
+                  ctx.lineTo(cx + w + slant, baseY - h);
+                  ctx.lineTo(cx + slant, baseY - h);
+              } else if (type === 1) { 
+                  ctx.moveTo(cx, baseY);
+                  ctx.lineTo(cx + w, baseY);
+                  ctx.lineTo(cx + w/2 + slant + w/4, baseY - h);
+                  ctx.lineTo(cx + w/2 + slant - w/4, baseY - h);
+              } else { 
+                  ctx.moveTo(cx, baseY);
+                  ctx.lineTo(cx + w, baseY);
+                  ctx.lineTo(cx + w/2 + slant, baseY - h);
               }
               ctx.closePath();
               ctx.fill();
@@ -1679,9 +1679,8 @@
         testModeUI.style.display = 'none';
     }
 
-    // カメラの追従ライン（height * 0.6）より少し下（+40px）に地上を設定
     startGroundY = height * 0.6 + 40; 
-    startZeroAltY = startGroundY - 40; // 高度0mの基準線
+    startZeroAltY = startGroundY - 40; 
 
     isPlaying = true;
     isPaused = false;
@@ -2523,24 +2522,24 @@
       if (p.invisibleWall) continue; 
 
       if (p.isGround) {
-          // 見えない壁の奥側までグラフィックを拡張（16px広げる）
           let dp = {x: p.x - 16, y: p.y, w: p.w + 32, h: p.h, slope: 0};
           let endY = dp.y;
           
-          let darkGroundStr = '#3d2616'; // 濃い茶色
+          let darkGroundStr = '#3d2616'; 
           
-          // 地中の基本色
           drawPlatformLayer(ctx, dp, endY, 10, dp.h - 10, darkGroundStr); 
           
-          // 地中の小石など
           ctx.save();
           ctx.beginPath();
           ctx.rect(dp.x, dp.y + 10, dp.w, dp.h - 10);
           ctx.clip();
+          
+          // 地中の深さから生成数を計算
+          let stoneCount = Math.floor(dp.h / 2);
           let stoneSeed = 888;
-          for (let i = 0; i < 500; i++) {
+          for (let i = 0; i < stoneCount; i++) {
                let sx = dp.x + pRand(stoneSeed++) * dp.w;
-               let sy = dp.y + 10 + pRand(stoneSeed++) * 990;
+               let sy = dp.y + 10 + pRand(stoneSeed++) * (dp.h - 10);
                let size = 6 + pRand(stoneSeed++) * 14; 
                let type = Math.floor(pRand(stoneSeed++) * 3);
                let isDark = pRand(stoneSeed++) < 0.5;
@@ -2565,14 +2564,14 @@
           }
           ctx.restore();
 
-          // 地表の緑色（より濃い緑に変更）
-          let surfaceBase = '#2e7d32'; 
-          let surfaceTop = '#43a047';
+          // 地表の緑色（少し濃い色に変更）
+          let surfaceBase = '#1b5e20'; 
+          let surfaceTop = '#2e7d32';
           drawPlatformLayer(ctx, dp, endY, 0, 10, surfaceBase);  
           drawPlatformLayer(ctx, dp, endY, 0, 3, surfaceTop);   
 
-          // レイヤー1：奥の雑草（塔とキャラクターの間）
-          drawWeeds(ctx, dp, 100, '#4caf50');
+          // レイヤー1：奥の雑草（8キャラ〜12キャラ分、色は変更なし、Yズレなし）
+          drawWeeds(ctx, dp, 100, '#4caf50', 8, 12, 0);
 
       } else {
           drawStonePlatform(ctx, p);
@@ -2757,15 +2756,15 @@
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         
-        // パラペット
         if (p.isSafety && !p.isGround) {
             drawParapet(ctx, p);
         }
         
-        // レイヤー2：手前の雑草（キャラクターの前）
         if (p.isGround) {
             let dp = {x: p.x - 16, y: p.y, w: p.w + 32, h: p.h, slope: 0};
-            drawWeeds(ctx, dp, 200, '#66bb6a'); // 色を少し明るく、シードをずらす
+            let surfaceTop = '#2e7d32'; // 地表の上の層の色
+            // レイヤー2：手前の雑草（6〜10キャラ分、地表と同じ色、境目を隠すためYを1px下げる）
+            drawWeeds(ctx, dp, 200, surfaceTop, 6, 10, 1);
         }
     }
     ctx.restore();
