@@ -673,6 +673,7 @@
     wallHitPlatform: null,
     wallHitType: 3, 
     preHitVx: 0,  
+    preHitVy: 0,
     isWallBouncing: false, 
     
     confusionEndTime: 0,
@@ -1595,6 +1596,7 @@
     player.onGround = true; 
     player.currentPlatform = null;
     player.preHitVx = 0;
+    player.preHitVy = 0;
     player.isWallBouncing = false; 
     
     player.jumpStartX = player.x;
@@ -1768,14 +1770,9 @@
                   player.vy = 0;
               } else {
                   
-                  let bounceVx = -player.preHitVx * 0.85;
-                  
-                  if (player.wallHitDir === 1 && bounceVx > -2) bounceVx = -2;
-                  if (player.wallHitDir === -1 && bounceVx < 2) bounceVx = 2;
-                  
-                  player.airVx = bounceVx;
+                  player.airVx = -player.preHitVx * 0.85;
                   player.vx = player.airVx;
-                  player.vy = -7; 
+                  player.vy = player.preHitVy * 0.85; 
                   player.isWallBouncing = true;
               }
               player.onGround = false;
@@ -1941,7 +1938,7 @@
 
       for (let p of activePlatforms) {
         if (p.invisibleWall) continue; 
-        if (hitStopEndTime > now) break; // 【追加】ディレイが発生した瞬間に他の当たり判定処理を強制終了しゼロ化する
+        if (hitStopEndTime > now) break; 
 
         let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
         
@@ -1993,7 +1990,6 @@
                 if (wasOnGround && player.vy >= -2) {
                     hitFromAbove = true;
                 } else if (hitFromLeft || hitFromRight) {
-                    // 【修正】横からの激突時は、完全に上から落ちてきた場合のみ着地とみなす（許容範囲+1pxに厳格化）
                     if (oBottom <= oldSurfaceY + 1) {
                         hitFromAbove = true;
                     }
@@ -2138,6 +2134,7 @@
                       player.wallHitPlatform = p;
                       
                       player.preHitVx = oldVx; 
+                      player.preHitVy = oldVy; 
                   }
               }
             }
