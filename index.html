@@ -297,6 +297,7 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
+  // テストモードフラグ（falseにすると本番仕様が有効になります）
   const IS_TEST_MODE = false; 
 
   const canvas = document.getElementById('gameCanvas');
@@ -399,7 +400,6 @@
       return h - Math.floor(h);
   }
 
-  // --- 塔の色計算 ---
   function getBaseTowerColor(altMeters) {
       let clampedAlt = Math.max(0, Math.min(8000, altMeters));
       let step = Math.floor(clampedAlt / 1000); 
@@ -417,7 +417,6 @@
       let dist = Math.abs(blockCenter - center);
       let maxDist = (towerRight - towerLeft) / 2;
       
-      // 端に行くほど暗くなる(最低で元の0.5倍)
       let factor = 1.0 - Math.pow(dist / maxDist, 2.0) * 0.5; 
       
       let r = Math.floor(baseColor.r * factor);
@@ -425,7 +424,6 @@
       let b = Math.floor(baseColor.b * factor);
       return {r: r, g: g, b: b};
   }
-  // ------------------
 
   function saveData() {
       localStorage.setItem('jm_totalCoins', totalCoins);
@@ -798,7 +796,6 @@
       let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
       
-      // 足場の色は塔のベースカラーの40% (塔の影の一番濃い部分は50%なのでそれより濃い)
       let bR = Math.floor(tColor.r * 0.4);
       let bG = Math.floor(tColor.g * 0.4);
       let bB = Math.floor(tColor.b * 0.4);
@@ -855,7 +852,6 @@
       let altMeters = Math.max(0, (height - 40 - p.y) / PIXELS_PER_METER);
       let tColor = getBaseTowerColor(altMeters);
       
-      // 足場の色は塔のベースカラーの40%
       let bR = Math.floor(tColor.r * 0.4);
       let bG = Math.floor(tColor.g * 0.4);
       let bB = Math.floor(tColor.b * 0.4);
@@ -2321,7 +2317,6 @@
                 let drawX = Math.max(towerLeft, bx);
                 let drawW_block = Math.min(towerRight, bx + blockW) - drawX;
                 
-                // ブロックの基本色を計算して描画
                 let blockColorObj = getCylinderColorRGB(baseColor, drawX, drawW_block, towerLeft, towerRight);
                 ctx.fillStyle = `rgb(${blockColorObj.r}, ${blockColorObj.g}, ${blockColorObj.b})`;
                 ctx.fillRect(drawX, y, drawW_block, blockH);
@@ -2329,10 +2324,8 @@
                 let seed = bx * 13.1 + y * 97.3;
                 let altRatio = Math.max(0, Math.min(1, altMeters / 15000));
                 
-                // 汚れ・傷の描画
                 let dirtProb = 0.8 * (1 - altRatio);
                 if (pRand(seed) < dirtProb) {
-                    // 対象ブロックより少し濃い色（暗い色）を設定
                     let dirtR = Math.max(0, blockColorObj.r - 40);
                     let dirtG = Math.max(0, blockColorObj.g - 40);
                     let dirtB = Math.max(0, blockColorObj.b - 40);
@@ -2352,12 +2345,12 @@
                         let sw = 4 + pRand(seed+10+s) * 12;
                         let sh = 4 + pRand(seed+11+s) * 12;
                         
-                        // 塔の左右端から3px以上外側にはみ出さないよう制限(クランプ)
-                        if (spotX < towerLeft - 3) {
-                            spotX = towerLeft - 3;
+                        // 塔の輪郭より2px以上外側にはみ出さないよう制限
+                        if (spotX < towerLeft - 2) {
+                            spotX = towerLeft - 2;
                         }
-                        if (spotX + sw > towerRight + 3) {
-                            sw = (towerRight + 3) - spotX;
+                        if (spotX + sw > towerRight + 2) {
+                            sw = (towerRight + 2) - spotX;
                         }
                         
                         if (sw > 0) {
@@ -2390,9 +2383,9 @@
                             let mw = 3 + pRand(seed+105+i) * 6;
                             let mh = 3 + pRand(seed+106+i) * 6;
                             
-                            // 苔も念のため制限
-                            if (mx < towerLeft - 3) mx = towerLeft - 3;
-                            if (mx + mw > towerRight + 3) mw = (towerRight + 3) - mx;
+                            // 苔の2pxはみ出し制限
+                            if (mx < towerLeft - 2) mx = towerLeft - 2;
+                            if (mx + mw > towerRight + 2) mw = (towerRight + 2) - mx;
                             
                             if (mw > 0) ctx.fillRect(mx, my, mw, mh);
                         }
@@ -2402,7 +2395,8 @@
                         let curX = drawX + pRand(seed+108) * drawW_block;
                         let curY = y;
                         for(let v = 0; v < vineLen; v++) {
-                            if (curX >= towerLeft - 3 && curX <= towerRight + 3) {
+                            // ツルの2pxはみ出し制限
+                            if (curX >= towerLeft - 2 && curX <= towerRight + 2) {
                                 ctx.fillRect(curX, curY, 3, 6);
                             }
                             curY += 5;
@@ -2412,7 +2406,9 @@
                                 let leafSize = 4 + pRand(seed+111+v) * 5;
                                 let dir = pRand(seed+112+v) < 0.5 ? 1 : -1;
                                 
-                                if (curX >= towerLeft - 3 && curX + (dir * leafSize) <= towerRight + 3 && curX + (dir * leafSize) >= towerLeft - 3) {
+                                // 葉っぱの2pxはみ出し制限
+                                if (curX >= towerLeft - 2 && curX <= towerRight + 2 &&
+                                    curX + (dir * leafSize) >= towerLeft - 2 && curX + (dir * leafSize) <= towerRight + 2) {
                                     ctx.beginPath();
                                     ctx.moveTo(curX, curY);
                                     ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
@@ -2473,7 +2469,6 @@
           let endY = p.y + p.w * tan;
           let tColor = getBaseTowerColor(0);
           
-          // 地面のベースも40%に設定
           let bR = Math.floor(tColor.r * 0.4);
           let bG = Math.floor(tColor.g * 0.4);
           let bB = Math.floor(tColor.b * 0.4);
