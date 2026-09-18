@@ -340,7 +340,6 @@
   const LIMIT_LEFT = -STAGE_EXPAND;
   const LIMIT_RIGHT = width + STAGE_EXPAND;
 
-  // 動的な地上位置の管理
   let startGroundY = 0;
   let startZeroAltY = 0;
 
@@ -361,6 +360,9 @@
   let lastReleaseTime = 0; 
 
   let tapTimes = [];
+  let isCalibrating = false;
+  let lastCalibrationSoundTime = 0;
+  
   let systemMessage = "";
   let systemMessageEndTime = 0;
   let achTimer = null; 
@@ -513,6 +515,43 @@
       filter.connect(gain);
       gain.connect(audioCtx.destination);
       noise.start();
+  }
+
+  // --- 可愛らしいプルプルッという音 ---
+  function playSePurupuru() {
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const startTime = audioCtx.currentTime;
+      const duration = 0.5;
+
+      const osc = audioCtx.createOscillator();
+      const lfo = audioCtx.createOscillator();
+      const lfoGain = audioCtx.createGain();
+      const mainGain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.value = 600;
+
+      lfo.type = 'sine';
+      lfo.frequency.value = 25; // 震えの速さ（25Hz）
+
+      lfoGain.gain.value = 150; // 震えの深さ（周波数変調幅）
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+
+      mainGain.gain.setValueAtTime(0, startTime);
+      mainGain.gain.linearRampToValueAtTime(0.4 * seVolume, startTime + 0.05);
+      mainGain.gain.linearRampToValueAtTime(0.4 * seVolume, startTime + 0.45);
+      mainGain.gain.linearRampToValueAtTime(0.01, startTime + duration);
+
+      osc.connect(mainGain);
+      mainGain.connect(audioCtx.destination);
+
+      osc.start(startTime);
+      lfo.start(startTime);
+      osc.stop(startTime + duration);
+      lfo.stop(startTime + duration);
   }
 
   function createSlimeBloop(startFreq, endFreq, duration) {
@@ -782,7 +821,6 @@
       ctx.fill();
   }
 
-  // --- 塔の背景キャッシュ生成処理（隙間対策付き） ---
   function renderTowerChunkToCache(idx) {
       let chunkBottomY = startZeroAltY - idx * CHUNK_HEIGHT_PX;
       let chunkTopY = chunkBottomY - CHUNK_HEIGHT_PX;
@@ -798,7 +836,6 @@
       let canvas = document.createElement('canvas');
       canvas.width = towerWidth;
       
-      // idx === 0（一番下のチャンク）の場合のみ、地面（startGroundY）まで届くよう高さを延長
       let extraH = (idx === 0) ? (startGroundY - startZeroAltY) : 0;
       canvas.height = CHUNK_HEIGHT_PX + extraH;
       
@@ -1295,7 +1332,7 @@
     initialSigns = [
       { x: width * 0.15 - 20, y: startGroundY, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
       { x: width * 0.38 - 20, y: startGroundY, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
-      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n空中にいない時に1秒間に3回連続タップで\n姿勢を基準にジャイロをリセットします。" },
+      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に3回タップし、\n3回目を長押しするとジャイロを調整します。" },
       { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！\n👟 壁と反対に傾けてタップで壁ジャンプ！" }
     ];
   }
@@ -1624,15 +1661,14 @@
     
     if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
         
-        // 【修正】壁の反対側へ±8度以上傾けているかの判定（ジャイロの仕様に合わせた向き）
-        let isTiltedAway = (player.wallHitDir === 1 && tilt < -8) || (player.wallHitDir === -1 && tilt > 8);
+        // 【閾値を5に変更】壁の反対側へ±5度以上傾けているかの判定
+        let isTiltedAway = (player.wallHitDir === 1 && tilt < -5) || (player.wallHitDir === -1 && tilt > 5);
 
         if (isTiltedAway) {
             // --- 壁ジャンプの実行 ---
             let jumpX = tilt * player.speed * 1.0; 
-            // tiltYは奥に傾けるとマイナス。奥に傾けた分だけ上方向(マイナス)のジャンプ力を得る
             let yAngle = Math.max(0, -tiltY); 
-            let jumpY = -yAngle * player.speed * 1.15; // 上向きのためマイナス
+            let jumpY = -yAngle * player.speed * 1.15; 
             
             player.vx = jumpX;
             player.airVx = jumpX;
@@ -1645,10 +1681,10 @@
             
             player.jumpStartX = player.x;
             player.jumpStartY = player.y;
-            player.lastJumpChargeTime = 1000; // サウンド・着地判定用ダミー値
+            player.lastJumpChargeTime = 1000; 
             player.isBigFalling = false;
             
-            hitStopEndTime = 0; // ディレイ解除
+            hitStopEndTime = 0; 
             player.wallHitPlatform = null;
             player.wallHitDir = 0;
             
@@ -1658,7 +1694,7 @@
             player.isClimbing = true;
             player.climbStartTime = now;
             
-            let cDur = 800; // よじ登り時間も0.8秒に延長
+            let cDur = 800; 
             
             player.climbDuration = cDur;
             player.climbEndTime = now + cDur; 
@@ -1721,6 +1757,7 @@
     }
   }
 
+  // --- タップイベント（長押しキャリブレーション対応） ---
   window.addEventListener('touchstart', (e) => {
       if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#pauseBtn') || e.target.closest('#pauseMenu')) return;
       isPointerDown = true;
@@ -1732,21 +1769,28 @@
       tapTimes = tapTimes.filter(t => now - t <= 1000); 
       
       if (tapTimes.length >= 3) {
-          if (!inAirNow) {
-              let q = eulerToQuat(currentAlpha, currentBeta, currentGamma);
-              baseQuat = q;
-              showSystemMessage("ジャイロ基準位置をリセットしました");
+          if (!inAirNow && hitStopEndTime <= now) {
+              isCalibrating = true;
+              lastCalibrationSoundTime = 0; // すぐに音が鳴るようにセット
           }
           tapTimes = []; 
           return; 
       }
       
       if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
-          startAction();
+          startAction(); // タップで壁ジャンプ or よじ登りを発動
       }
   }, {passive: false});
 
   window.addEventListener('touchend', (e) => {
+      if (isCalibrating) {
+          isCalibrating = false;
+          baseQuat = eulerToQuat(currentAlpha, currentBeta, currentGamma);
+          showSystemMessage("ジャイロ基準位置をリセットしました");
+          isPointerDown = false;
+          lastReleaseTime = Date.now();
+          return;
+      }
       endAction();
   });
 
@@ -1964,6 +2008,8 @@
     
     baseQuat = [1, 0, 0, 0];
     tapTimes = [];
+    isCalibrating = false;
+    lastCalibrationSoundTime = 0;
     systemMessage = "";
     lastChargeSoundTime = 0;
     
@@ -1975,7 +2021,7 @@
     
     setupSigns(); 
     createInitialPlatforms();
-    towerCaches = {}; // 塔のキャッシュを初期化
+    towerCaches = {}; 
     initClouds();
 
     requestAnimationFrame(update);
@@ -2013,7 +2059,7 @@
     ctx.clearRect(0, 0, width, height);
 
     let currentChunkIndex = getChunkIndexByY(player.y);
-    manageCaches(currentChunkIndex); // キャッシュの破棄管理を実行
+    manageCaches(currentChunkIndex); 
     let activePlatforms = getActivePlatforms(currentChunkIndex);
 
     let activeMessage = null;
@@ -2070,7 +2116,8 @@
     let isNormalConfused = player.confusionEndTime > now;
 
     if (isPointerDown && !isPressing) {
-       if (!isNormalConfused && !isBigFallConfused && now - lastReleaseTime >= 300) {
+       // キャリブレーション中はチャージ開始をブロック
+       if (!isNormalConfused && !isBigFallConfused && now - lastReleaseTime >= 300 && !isCalibrating) {
            isPressing = true;
            pressStartTime = now;
            lastChargeSoundTime = now; 
@@ -2084,7 +2131,19 @@
         }
     }
 
-    if (player.isClimbing) {
+    // --- 物理演算・移動処理 ---
+    if (isCalibrating) {
+        // キャリブレーション中は停止して震える
+        player.vx = 0;
+        player.vy = 0;
+        player.airVx = 0;
+        isPressing = false; 
+        
+        if (now - lastCalibrationSoundTime >= 1000) {
+            playSePurupuru();
+            lastCalibrationSoundTime = now;
+        }
+    } else if (player.isClimbing) {
       let elapsed = now - player.climbStartTime;
       let ratio = elapsed / player.climbDuration;
       
@@ -2392,7 +2451,7 @@
                   
                   if (distFromStart >= player.size) {
                       playSeHitLight();
-                      let stunTime = 800; // 操作受付時間を0.8秒へ延長
+                      let stunTime = 800; 
                       hitStopEndTime = now + stunTime; 
                       player.hitStopCooldownEndTime = now + stunTime + 200;
                       player.wallHitDir = hitLeftEdge ? 1 : -1; 
@@ -2455,7 +2514,7 @@
                   if (distFromStart >= player.size) {
                       playSeHitLight();
                       
-                      let stunTime = 800; // 操作受付時間を0.8秒へ延長
+                      let stunTime = 800; 
                       
                       hitStopEndTime = now + stunTime; 
                       player.hitStopCooldownEndTime = now + stunTime + 200;
@@ -2585,7 +2644,6 @@
     ctx.save();
     ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
 
-    // --- 塔のキャッシュのスクロール描画 ---
     let towerLeft = 48;
     let towerRight = width - 48;
     let groundY = startGroundY;
@@ -2637,7 +2695,6 @@
       ctx.fillText("！", sign.x, iconY);
     }
 
-    // --- キャッシュを用いた足場・背景の描画 ---
     for (let p of activePlatforms) {
       if (p.invisibleWall) continue; 
       
@@ -2696,7 +2753,17 @@
         }
     }
 
-    ctx.translate(cx, cy);
+    // --- キャリブレーション中のプルプル描画 ---
+    let purupuruX = 0;
+    let purupuruY = 0;
+    if (isCalibrating) {
+        let cycle = now - lastCalibrationSoundTime;
+        if (cycle < 500) { 
+            purupuruX = (Math.random() - 0.5) * 6;
+            purupuruY = (Math.random() - 0.5) * 6;
+        }
+    }
+    ctx.translate(cx + purupuruX, cy + purupuruY);
 
     if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
         ctx.font = "16px 'DotGothic16', sans-serif";
@@ -2721,8 +2788,7 @@
             ctx.globalAlpha = 1.0; 
             ctx.fillText("🖐️", localIconX, localIconY);
         } else {
-            // 【修正】壁と反対側に傾けているかどうかの判定（±8度）
-            let isTiltedAway = (player.wallHitDir === 1 && tilt < -8) || (player.wallHitDir === -1 && tilt > 8);
+            let isTiltedAway = (player.wallHitDir === 1 && tilt < -5) || (player.wallHitDir === -1 && tilt > 5);
             let iconStr = isTiltedAway ? "👟" : "🖐️";
 
             ctx.font = "20px 'DotGothic16', sans-serif";
