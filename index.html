@@ -352,8 +352,8 @@
   let elapsedMs = 0;
   let lastFrameTime = 0;
 
-  let tilt = 0; // X軸（左右）の傾き
-  let tiltY = 0; // Y軸（前後）の傾き
+  let tilt = 0; 
+  let tiltY = 0; 
   
   let isPressing = false;       
   let isPointerDown = false;    
@@ -698,7 +698,7 @@
     climbStartX: 0,
     climbTargetY: 0,
     climbTargetX: 0,
-    climbDuration: 500, 
+    climbDuration: 800, 
     
     wallHitDir: 0, 
     wallHitPlatform: null,
@@ -718,6 +718,7 @@
   };
 
   let chunks = {};
+  let towerCaches = {}; 
   let generatedHighestPlatform = null; 
   let initialSigns = [];
 
@@ -779,6 +780,143 @@
       ctx.lineTo(p.x, p.y + yOffset + thickness);
       ctx.closePath();
       ctx.fill();
+  }
+
+  function renderTowerChunkToCache(idx) {
+      let chunkBottomY = startZeroAltY - idx * CHUNK_HEIGHT_PX;
+      let chunkTopY = chunkBottomY - CHUNK_HEIGHT_PX;
+      
+      let towerLeft = 48;
+      let towerRight = width - 48;
+      let towerWidth = towerRight - towerLeft;
+      
+      let blockH = 64;
+      let blockW = 128;
+      let startY = Math.floor(chunkTopY / blockH) * blockH;
+      
+      let canvas = document.createElement('canvas');
+      canvas.width = towerWidth;
+      canvas.height = CHUNK_HEIGHT_PX;
+      let ctx = canvas.getContext('2d');
+      
+      ctx.translate(-towerLeft, -chunkTopY);
+      
+      let drawBottom = Math.min(chunkBottomY, startGroundY);
+      
+      ctx.lineWidth = 2;
+      
+      for (let y = startY; y < drawBottom; y += blockH) {
+          let altMeters = Math.max(0, (startGroundY - y) / PIXELS_PER_METER);
+          let baseColor = getBaseTowerColor(altMeters);
+          
+          let rowIdx = Math.floor(y / blockH);
+          let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
+          
+          for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
+              let bx = x + offset;
+              if (bx > towerRight || bx + blockW < towerLeft) continue;
+              
+              let drawX = Math.max(towerLeft, bx);
+              let drawW_block = Math.min(towerRight, bx + blockW) - drawX;
+              
+              let blockColorObj = getCylinderColorRGB(baseColor, drawX, drawW_block, towerLeft, towerRight);
+              ctx.fillStyle = `rgb(${blockColorObj.r}, ${blockColorObj.g}, ${blockColorObj.b})`;
+              ctx.fillRect(drawX, y, drawW_block, blockH);
+              
+              let seed = bx * 13.1 + y * 97.3;
+              let altRatio = Math.max(0, Math.min(1, altMeters / 15000));
+              
+              let dirtProb = 0.8 * (1 - altRatio);
+              if (pRand(seed) < dirtProb) {
+                  let dirtR = Math.max(0, blockColorObj.r - 40);
+                  let dirtG = Math.max(0, blockColorObj.g - 40);
+                  let dirtB = Math.max(0, blockColorObj.b - 40);
+                  ctx.fillStyle = `rgba(${dirtR}, ${dirtG}, ${dirtB}, 0.8)`;
+                  
+                  let spots = Math.floor(pRand(seed+1) * 5) + 2;
+                  for (let s=0; s<spots; s++) {
+                      let spotX = drawX + pRand(seed+2+s) * drawW_block;
+                      let isEdgeY = pRand(seed+3+s) < 0.5;
+                      let spotY = y + (pRand(seed+4+s) < 0.5 ? pRand(seed+5+s)*10 : blockH - pRand(seed+5+s)*10);
+                      if (!isEdgeY) {
+                          spotY = y + pRand(seed+6+s) * blockH;
+                          spotX = drawX + (pRand(seed+7+s) < 0.5 ? pRand(seed+8+s)*10 : drawW_block - pRand(seed+8+s)*10);
+                      }
+                      
+                      let shapeType = Math.floor(pRand(seed+9+s) * 3);
+                      let sw = 4 + pRand(seed+10+s) * 12;
+                      let sh = 4 + pRand(seed+11+s) * 12;
+                      
+                      if (spotX < towerLeft - 2) spotX = towerLeft - 2;
+                      if (spotX + sw > towerRight + 2) sw = (towerRight + 2) - spotX;
+                      
+                      if (sw > 0) {
+                          ctx.beginPath();
+                          if (shapeType === 0) {
+                              ctx.rect(spotX, spotY, sw, sh);
+                          } else if (shapeType === 1) {
+                              ctx.moveTo(spotX, spotY); ctx.lineTo(spotX + sw, spotY + sh); ctx.lineTo(spotX, spotY + sh);
+                          } else {
+                              ctx.moveTo(spotX + sw, spotY); ctx.lineTo(spotX + sw, spotY + sh); ctx.lineTo(spotX, spotY);
+                          }
+                          ctx.fill();
+                      }
+                  }
+              }
+              
+              let mossProb = 0.1 + 0.7 * altRatio;
+              if (pRand(seed+100) < mossProb) {
+                  let isVine = pRand(seed+101) < 0.4;
+                  if (!isVine) {
+                      ctx.fillStyle = "rgba(45, 80, 40, 0.85)";
+                      let mossCount = Math.floor(pRand(seed+102) * 6) + 3;
+                      for(let i = 0; i < mossCount; i++) {
+                          let mx = drawX + pRand(seed+103+i) * drawW_block;
+                          let my = y + pRand(seed+104+i) * 20 - 5;
+                          let mw = 3 + pRand(seed+105+i) * 6;
+                          let mh = 3 + pRand(seed+106+i) * 6;
+                          if (mx < towerLeft - 2) mx = towerLeft - 2;
+                          if (mx + mw > towerRight + 2) mw = (towerRight + 2) - mx;
+                          if (mw > 0) ctx.fillRect(mx, my, mw, mh);
+                      }
+                  } else {
+                      ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
+                      let vineLen = Math.floor(pRand(seed+107) * 8) + 4;
+                      let curX = drawX + pRand(seed+108) * drawW_block;
+                      let curY = y;
+                      for(let v = 0; v < vineLen; v++) {
+                          if (curX >= towerLeft - 2 && curX <= towerRight + 2) {
+                              ctx.fillRect(curX, curY, 3, 6);
+                          }
+                          curY += 5;
+                          curX += (pRand(seed+109+v) - 0.5) * 8;
+                          if (pRand(seed+110+v) < 0.7) {
+                              let leafSize = 4 + pRand(seed+111+v) * 5;
+                              let dir = pRand(seed+112+v) < 0.5 ? 1 : -1;
+                              if (curX >= towerLeft - 2 && curX + (dir * leafSize) <= towerRight + 2 && curX + (dir * leafSize) >= towerLeft - 2) {
+                                  ctx.beginPath();
+                                  ctx.moveTo(curX, curY);
+                                  ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
+                                  ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
+                                  ctx.fill();
+                              }
+                          }
+                      }
+                  }
+              }
+              
+              ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+              ctx.beginPath();
+              ctx.moveTo(drawX, y + blockH);
+              ctx.lineTo(drawX + drawW_block, y + blockH);
+              if (bx + blockW <= towerRight && bx + blockW >= towerLeft) {
+                  ctx.moveTo(bx + blockW, y);
+                  ctx.lineTo(bx + blockW, y + blockH);
+              }
+              ctx.stroke();
+          }
+      }
+      return canvas;
   }
 
   function renderPlatformToCache(p) {
@@ -944,6 +1082,7 @@
   }
 
   function manageCaches(currentChunkIndex) {
+      // 足場のキャッシュ破棄
       for (let idxStr in chunks) {
           let idx = parseInt(idxStr);
           if (idx < currentChunkIndex - 2 || idx > currentChunkIndex + 2) {
@@ -951,6 +1090,14 @@
               for (let i = 0; i < chunk.length; i++) {
                   chunk[i].cachedCanvas = null; 
               }
+          }
+      }
+      
+      // 塔の背景キャッシュ破棄
+      for (let idxStr in towerCaches) {
+          let idx = parseInt(idxStr);
+          if (idx < currentChunkIndex - 2 || idx > currentChunkIndex + 2) {
+              delete towerCaches[idx];
           }
       }
   }
@@ -1147,7 +1294,7 @@
       { x: width * 0.15 - 20, y: startGroundY, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
       { x: width * 0.38 - 20, y: startGroundY, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
       { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n空中にいない時に1秒間に3回連続タップで\n姿勢を基準にジャイロをリセットします。" },
-      { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！" }
+      { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！\n👟 壁と反対に傾けてタップで壁ジャンプ！" }
     ];
   }
 
@@ -1475,8 +1622,8 @@
     
     if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
         
-        // 【壁ジャンプ判定】足場の反対側に傾いているか（少しの遊びを持たせて3度以上）
-        let isTiltedAway = (player.wallHitDir === 1 && tilt > 3) || (player.wallHitDir === -1 && tilt < -3);
+        // 【修正】壁の反対側へ±8度以上傾けているかの判定（ジャイロの仕様に合わせた向き）
+        let isTiltedAway = (player.wallHitDir === 1 && tilt < -8) || (player.wallHitDir === -1 && tilt > 8);
 
         if (isTiltedAway) {
             // --- 壁ジャンプの実行 ---
@@ -1508,7 +1655,7 @@
             player.isClimbing = true;
             player.climbStartTime = now;
             
-            let cDur = 500; 
+            let cDur = 800; // よじ登り時間も0.8秒に延長
             
             player.climbDuration = cDur;
             player.climbEndTime = now + cDur; 
@@ -1627,7 +1774,6 @@
       if (g < -45) g = -45;
       tilt = g;
 
-      // 【追加】Y軸（前後方向・ピッチ）の傾きを取得
       let b = relAngles.beta;
       if (b > 45) b = 45;
       if (b < -45) b = -45;
@@ -1778,7 +1924,7 @@
     isPointerDown = false;
     lastReleaseTime = Date.now();
     tilt = 0;
-    tiltY = 0; // 追加
+    tiltY = 0; 
     maxAltitude = 0;
     bestScore = 0; 
     nextSafetyLevel = 1;
@@ -1826,6 +1972,7 @@
     
     setupSigns(); 
     createInitialPlatforms();
+    towerCaches = {}; // 塔のキャッシュを初期化
     initClouds();
 
     requestAnimationFrame(update);
@@ -2242,7 +2389,7 @@
                   
                   if (distFromStart >= player.size) {
                       playSeHitLight();
-                      let stunTime = 500; // ディレイを0.5秒に統一
+                      let stunTime = 800; // 操作受付時間を0.8秒へ延長
                       hitStopEndTime = now + stunTime; 
                       player.hitStopCooldownEndTime = now + stunTime + 200;
                       player.wallHitDir = hitLeftEdge ? 1 : -1; 
@@ -2305,7 +2452,7 @@
                   if (distFromStart >= player.size) {
                       playSeHitLight();
                       
-                      let stunTime = 500; // ディレイを0.5秒に統一
+                      let stunTime = 800; // 操作受付時間を0.8秒へ延長
                       
                       hitStopEndTime = now + stunTime; 
                       player.hitStopCooldownEndTime = now + stunTime + 200;
@@ -2435,9 +2582,9 @@
     ctx.save();
     ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
 
+    // --- 塔のキャッシュのスクロール描画 ---
     let towerLeft = 48;
     let towerRight = width - 48;
-    let towerWidth = towerRight - towerLeft;
     let groundY = startGroundY;
     let topY = groundY - 15000 * PIXELS_PER_METER;
 
@@ -2447,134 +2594,15 @@
     let drawBottom = Math.min(groundY, screenBottomY + 100);
 
     if (drawTop < drawBottom) {
-        let blockH = 64;
-        let blockW = 128;
-        let startY = Math.floor(drawTop / blockH) * blockH;
+        let topIdx = getChunkIndexByY(drawTop);
+        let bottomIdx = getChunkIndexByY(drawBottom);
         
-        ctx.lineWidth = 2;
-        
-        for (let y = startY; y <= drawBottom; y += blockH) {
-            let altMeters = Math.max(0, (groundY - y) / PIXELS_PER_METER);
-            let baseColor = getBaseTowerColor(altMeters);
-            
-            let rowIdx = Math.floor(y / blockH);
-            let offset = (rowIdx % 2 === 0) ? 0 : (blockW / 2);
-            
-            for (let x = towerLeft - blockW; x <= towerRight; x += blockW) {
-                let bx = x + offset;
-                if (bx > towerRight || bx + blockW < towerLeft) continue;
-                
-                let drawX = Math.max(towerLeft, bx);
-                let drawW_block = Math.min(towerRight, bx + blockW) - drawX;
-                
-                let blockColorObj = getCylinderColorRGB(baseColor, drawX, drawW_block, towerLeft, towerRight);
-                ctx.fillStyle = `rgb(${blockColorObj.r}, ${blockColorObj.g}, ${blockColorObj.b})`;
-                ctx.fillRect(drawX, y, drawW_block, blockH);
-                
-                let seed = bx * 13.1 + y * 97.3;
-                let altRatio = Math.max(0, Math.min(1, altMeters / 15000));
-                
-                let dirtProb = 0.8 * (1 - altRatio);
-                if (pRand(seed) < dirtProb) {
-                    let dirtR = Math.max(0, blockColorObj.r - 40);
-                    let dirtG = Math.max(0, blockColorObj.g - 40);
-                    let dirtB = Math.max(0, blockColorObj.b - 40);
-                    ctx.fillStyle = `rgba(${dirtR}, ${dirtG}, ${dirtB}, 0.8)`;
-                    
-                    let spots = Math.floor(pRand(seed+1) * 5) + 2;
-                    for (let s=0; s<spots; s++) {
-                        let spotX = drawX + pRand(seed+2+s) * drawW_block;
-                        let isEdgeY = pRand(seed+3+s) < 0.5;
-                        let spotY = y + (pRand(seed+4+s) < 0.5 ? pRand(seed+5+s)*10 : blockH - pRand(seed+5+s)*10);
-                        if (!isEdgeY) {
-                            spotY = y + pRand(seed+6+s) * blockH;
-                            spotX = drawX + (pRand(seed+7+s) < 0.5 ? pRand(seed+8+s)*10 : drawW_block - pRand(seed+8+s)*10);
-                        }
-                        
-                        let shapeType = Math.floor(pRand(seed+9+s) * 3);
-                        let sw = 4 + pRand(seed+10+s) * 12;
-                        let sh = 4 + pRand(seed+11+s) * 12;
-                        
-                        if (spotX < towerLeft - 2) {
-                            spotX = towerLeft - 2;
-                        }
-                        if (spotX + sw > towerRight + 2) {
-                            sw = (towerRight + 2) - spotX;
-                        }
-                        
-                        if (sw > 0) {
-                            ctx.beginPath();
-                            if (shapeType === 0) {
-                                ctx.rect(spotX, spotY, sw, sh);
-                            } else if (shapeType === 1) {
-                                ctx.moveTo(spotX, spotY);
-                                ctx.lineTo(spotX + sw, spotY + sh);
-                                ctx.lineTo(spotX, spotY + sh);
-                            } else {
-                                ctx.moveTo(spotX + sw, spotY);
-                                ctx.lineTo(spotX + sw, spotY + sh);
-                                ctx.lineTo(spotX, spotY);
-                            }
-                            ctx.fill();
-                        }
-                    }
-                }
-                
-                let mossProb = 0.1 + 0.7 * altRatio;
-                if (pRand(seed+100) < mossProb) {
-                    let isVine = pRand(seed+101) < 0.4;
-                    if (!isVine) {
-                        ctx.fillStyle = "rgba(45, 80, 40, 0.85)";
-                        let mossCount = Math.floor(pRand(seed+102) * 6) + 3;
-                        for(let i = 0; i < mossCount; i++) {
-                            let mx = drawX + pRand(seed+103+i) * drawW_block;
-                            let my = y + pRand(seed+104+i) * 20 - 5;
-                            let mw = 3 + pRand(seed+105+i) * 6;
-                            let mh = 3 + pRand(seed+106+i) * 6;
-                            
-                            if (mx < towerLeft - 2) mx = towerLeft - 2;
-                            if (mx + mw > towerRight + 2) mw = (towerRight + 2) - mx;
-                            
-                            if (mw > 0) ctx.fillRect(mx, my, mw, mh);
-                        }
-                    } else {
-                        ctx.fillStyle = "rgba(30, 60, 25, 0.9)";
-                        let vineLen = Math.floor(pRand(seed+107) * 8) + 4;
-                        let curX = drawX + pRand(seed+108) * drawW_block;
-                        let curY = y;
-                        for(let v = 0; v < vineLen; v++) {
-                            if (curX >= towerLeft - 2 && curX <= towerRight + 2) {
-                                ctx.fillRect(curX, curY, 3, 6);
-                            }
-                            curY += 5;
-                            curX += (pRand(seed+109+v) - 0.5) * 8;
-                            
-                            if (pRand(seed+110+v) < 0.7) {
-                                let leafSize = 4 + pRand(seed+111+v) * 5;
-                                let dir = pRand(seed+112+v) < 0.5 ? 1 : -1;
-                                
-                                if (curX >= towerLeft - 2 && curX + (dir * leafSize) <= towerRight + 2 && curX + (dir * leafSize) >= towerLeft - 2) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(curX, curY);
-                                    ctx.lineTo(curX + dir * leafSize, curY - leafSize * 0.5);
-                                    ctx.lineTo(curX + dir * leafSize * 0.4, curY + leafSize);
-                                    ctx.fill();
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
-                ctx.beginPath();
-                ctx.moveTo(drawX, y + blockH);
-                ctx.lineTo(drawX + drawW_block, y + blockH);
-                if (bx + blockW <= towerRight && bx + blockW >= towerLeft) {
-                    ctx.moveTo(bx + blockW, y);
-                    ctx.lineTo(bx + blockW, y + blockH);
-                }
-                ctx.stroke();
+        for (let idx = Math.min(topIdx, bottomIdx); idx <= Math.max(topIdx, bottomIdx); idx++) {
+            if (!towerCaches[idx]) {
+                towerCaches[idx] = renderTowerChunkToCache(idx);
             }
+            let chunkTopY = startZeroAltY - (idx + 1) * CHUNK_HEIGHT_PX;
+            ctx.drawImage(towerCaches[idx], towerLeft, chunkTopY);
         }
     }
 
@@ -2690,8 +2718,8 @@
             ctx.globalAlpha = 1.0; 
             ctx.fillText("🖐️", localIconX, localIconY);
         } else {
-            // 【追加】壁と反対側に傾いている場合はキックアイコンに変更
-            let isTiltedAway = (player.wallHitDir === 1 && tilt > 3) || (player.wallHitDir === -1 && tilt < -3);
+            // 【修正】壁と反対側に傾けているかどうかの判定（±8度）
+            let isTiltedAway = (player.wallHitDir === 1 && tilt < -8) || (player.wallHitDir === -1 && tilt > 8);
             let iconStr = isTiltedAway ? "👟" : "🖐️";
 
             ctx.font = "20px 'DotGothic16', sans-serif";
