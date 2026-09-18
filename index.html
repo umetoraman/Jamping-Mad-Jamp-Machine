@@ -297,7 +297,6 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
-  // テストモードフラグ（falseで本番仕様が有効になります）
   const IS_TEST_MODE = false; 
 
   const canvas = document.getElementById('gameCanvas');
@@ -1369,9 +1368,7 @@
         player.isClimbing = true;
         player.climbStartTime = now;
         
-        let cDur = 500;
-        if (player.wallHitType === 1) cDur = 300;
-        else if (player.wallHitType === 2) cDur = 700;
+        let cDur = 500; // よじ登り時間を一律0.5秒に変更
         
         player.climbDuration = cDur;
         player.climbEndTime = now + cDur; 
@@ -1634,32 +1631,33 @@
       let px = dp.x + 16 + spacing;
       
       ctx.fillStyle = color;
-      let baseY = dp.y + offsetY; // 位置を調整して隙間をなくす
+      let baseY = dp.y + offsetY; 
       
       for (let pw of patches) {
           let cx = px;
           while (cx < px + pw) {
-              let h = 3 + pRand(seed++) * 13; 
+              // 3px 〜 24px の高さに修正
+              let h = 3 + pRand(seed++) * 21; 
               let w = 2 + pRand(seed++) * 4;  
               let slant = (pRand(seed++) - 0.5) * 10; 
-              let type = Math.floor(pRand(seed++) * 3);
+              
+              // 先端部分のみ細くなる三角形の仕様
+              let tipRatio = 0.3 + pRand(seed++) * 0.2; // 30%〜50%が先端の三角形
+              let baseH = h * (1 - tipRatio);
+              let slantBase = slant * (1 - tipRatio);
               
               ctx.beginPath();
-              if (type === 0) { 
-                  ctx.moveTo(cx, baseY);
-                  ctx.lineTo(cx + w, baseY);
-                  ctx.lineTo(cx + w + slant, baseY - h);
-                  ctx.lineTo(cx + slant, baseY - h);
-              } else if (type === 1) { 
-                  ctx.moveTo(cx, baseY);
-                  ctx.lineTo(cx + w, baseY);
-                  ctx.lineTo(cx + w/2 + slant + w/4, baseY - h);
-                  ctx.lineTo(cx + w/2 + slant - w/4, baseY - h);
-              } else { 
-                  ctx.moveTo(cx, baseY);
-                  ctx.lineTo(cx + w, baseY);
-                  ctx.lineTo(cx + w/2 + slant, baseY - h);
-              }
+              // 左下
+              ctx.moveTo(cx, baseY);
+              // 右下
+              ctx.lineTo(cx + w, baseY);
+              // 右中間（太さを維持）
+              ctx.lineTo(cx + w + slantBase, baseY - baseH);
+              // 頂点（先に向かって細くなる）
+              ctx.lineTo(cx + w/2 + slant, baseY - h);
+              // 左中間（太さを維持）
+              ctx.lineTo(cx + slantBase, baseY - baseH);
+              
               ctx.closePath();
               ctx.fill();
               
@@ -2150,7 +2148,7 @@
                   
                   if (distFromStart >= player.size) {
                       playSeHitLight();
-                      let stunTime = 150;
+                      let stunTime = 500; // ディレイを0.5秒に統一
                       hitStopEndTime = now + stunTime; 
                       player.hitStopCooldownEndTime = now + stunTime + 200;
                       player.wallHitDir = hitLeftEdge ? 1 : -1; 
@@ -2213,10 +2211,7 @@
                   if (distFromStart >= player.size) {
                       playSeHitLight();
                       
-                      let stunTime = 300;
-                      if (hType === 1) stunTime = 500;
-                      else if (hType === 2) stunTime = 150;
-                      else if (hType === 3) stunTime = 300;
+                      let stunTime = 500; // ディレイを0.5秒に統一
                       
                       hitStopEndTime = now + stunTime; 
                       player.hitStopCooldownEndTime = now + stunTime + 200;
@@ -2517,7 +2512,6 @@
       ctx.fillText("！", sign.x, iconY);
     }
 
-    // --- 背景層の足場・地面・奥の雑草レイヤー描画 ---
     for (let p of activePlatforms) {
       if (p.invisibleWall) continue; 
 
@@ -2534,7 +2528,6 @@
           ctx.rect(dp.x, dp.y + 10, dp.w, dp.h - 10);
           ctx.clip();
           
-          // 地中の深さから生成数を計算
           let stoneCount = Math.floor(dp.h / 2);
           let stoneSeed = 888;
           for (let i = 0; i < stoneCount; i++) {
@@ -2564,13 +2557,11 @@
           }
           ctx.restore();
 
-          // 地表の緑色（少し濃い色に変更）
           let surfaceBase = '#1b5e20'; 
           let surfaceTop = '#2e7d32';
           drawPlatformLayer(ctx, dp, endY, 0, 10, surfaceBase);  
           drawPlatformLayer(ctx, dp, endY, 0, 3, surfaceTop);   
 
-          // レイヤー1：奥の雑草（8キャラ〜12キャラ分、色は変更なし、Yズレなし）
           drawWeeds(ctx, dp, 100, '#4caf50', 8, 12, 0);
 
       } else {
@@ -2751,7 +2742,6 @@
 
     ctx.restore();
 
-    // --- 手前レイヤー（キャラクターの前）の描画 ---
     ctx.save();
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
@@ -2762,8 +2752,7 @@
         
         if (p.isGround) {
             let dp = {x: p.x - 16, y: p.y, w: p.w + 32, h: p.h, slope: 0};
-            let surfaceTop = '#2e7d32'; // 地表の上の層の色
-            // レイヤー2：手前の雑草（6〜10キャラ分、地表と同じ色、境目を隠すためYを1px下げる）
+            let surfaceTop = '#2e7d32'; 
             drawWeeds(ctx, dp, 200, surfaceTop, 6, 10, 1);
         }
     }
