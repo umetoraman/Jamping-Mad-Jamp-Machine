@@ -360,6 +360,8 @@
   let lastReleaseTime = 0; 
 
   let tapTimes = [];
+  let isPendingCalibration = false;
+  let calibrationHoldStartTime = 0;
   let isCalibrating = false;
   let lastCalibrationSoundTime = 0;
   
@@ -517,41 +519,28 @@
       noise.start();
   }
 
-  // --- 可愛らしいプルプルッという音 ---
   function playSePurupuru() {
       if (!audioCtx) return;
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const startTime = audioCtx.currentTime;
-      const duration = 0.5;
+      const duration = 0.15; 
 
       const osc = audioCtx.createOscillator();
-      const lfo = audioCtx.createOscillator();
-      const lfoGain = audioCtx.createGain();
       const mainGain = audioCtx.createGain();
 
-      osc.type = 'sine';
-      osc.frequency.value = 600;
-
-      lfo.type = 'sine';
-      lfo.frequency.value = 25; // 震えの速さ（25Hz）
-
-      lfoGain.gain.value = 150; // 震えの深さ（周波数変調幅）
-
-      lfo.connect(lfoGain);
-      lfoGain.connect(osc.frequency);
+      osc.type = 'sine'; 
+      osc.frequency.setValueAtTime(400, startTime);
+      osc.frequency.exponentialRampToValueAtTime(600, startTime + duration);
 
       mainGain.gain.setValueAtTime(0, startTime);
-      mainGain.gain.linearRampToValueAtTime(0.4 * seVolume, startTime + 0.05);
-      mainGain.gain.linearRampToValueAtTime(0.4 * seVolume, startTime + 0.45);
-      mainGain.gain.linearRampToValueAtTime(0.01, startTime + duration);
+      mainGain.gain.linearRampToValueAtTime(0.4 * seVolume, startTime + 0.03);
+      mainGain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
 
       osc.connect(mainGain);
       mainGain.connect(audioCtx.destination);
 
       osc.start(startTime);
-      lfo.start(startTime);
       osc.stop(startTime + duration);
-      lfo.stop(startTime + duration);
   }
 
   function createSlimeBloop(startFreq, endFreq, duration) {
@@ -742,6 +731,7 @@
     wallHitDir: 0, 
     wallHitPlatform: null,
     wallHitType: 3, 
+    isWallJumping: false, 
     
     confusionEndTime: 0,
     hitStopCooldownEndTime: 0,
@@ -1332,8 +1322,8 @@
     initialSigns = [
       { x: width * 0.15 - 20, y: startGroundY, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
       { x: width * 0.38 - 20, y: startGroundY, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
-      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に3回タップし、\n3回目を長押しするとジャイロを調整します。" },
-      { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかった直後に画面をタップすると\n足場によじ登ります！\n👟 壁と反対に傾けてタップで壁ジャンプ！" }
+      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に3回タップし、\n3回目を1秒長押しするとジャイロを調整します。" },
+      { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかったら画面をタップで\n足場によじ登ります！\n👟 壁の反対へ傾けてタップで壁ジャンプ！" }
     ];
   }
 
@@ -1661,7 +1651,6 @@
     
     if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
         
-        // 【閾値を5に変更】壁の反対側へ±5度以上傾けているかの判定
         let isTiltedAway = (player.wallHitDir === 1 && tilt < -5) || (player.wallHitDir === -1 && tilt > 5);
 
         if (isTiltedAway) {
@@ -1683,6 +1672,7 @@
             player.jumpStartY = player.y;
             player.lastJumpChargeTime = 1000; 
             player.isBigFalling = false;
+            player.isWallJumping = true; 
             
             hitStopEndTime = 0; 
             player.wallHitPlatform = null;
@@ -1763,30 +1753,34 @@
       isPointerDown = true;
       
       const now = Date.now();
-      const inAirNow = !player.onGround && !player.isClimbing;
       
       tapTimes.push(now);
       tapTimes = tapTimes.filter(t => now - t <= 1000); 
       
       if (tapTimes.length >= 3) {
-          if (!inAirNow && hitStopEndTime <= now) {
-              isCalibrating = true;
-              lastCalibrationSoundTime = 0; // すぐに音が鳴るようにセット
+          let isConfused = (player.confusionEndTime > now) || (player.bigFallPenaltyEndTime > now);
+          // 地上かつ混乱状態ではなく、左右の傾きが10度未満の場合のみ待機状態へ
+          if (player.onGround && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 10) {
+              isPendingCalibration = true;
+              calibrationHoldStartTime = now;
           }
           tapTimes = []; 
           return; 
       }
       
       if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
-          startAction(); // タップで壁ジャンプ or よじ登りを発動
+          startAction(); 
       }
   }, {passive: false});
 
   window.addEventListener('touchend', (e) => {
+      if (isPendingCalibration) {
+          isPendingCalibration = false;
+      }
       if (isCalibrating) {
           isCalibrating = false;
           baseQuat = eulerToQuat(currentAlpha, currentBeta, currentGamma);
-          showSystemMessage("ジャイロ基準位置をリセットしました");
+          showSystemMessage("ジャイロの傾き調整が完了しました");
           isPointerDown = false;
           lastReleaseTime = Date.now();
           return;
@@ -1863,6 +1857,8 @@
     lastReleaseTime = Date.now(); 
     isPointerDown = false;
     isPressing = false;
+    isPendingCalibration = false;
+    isCalibrating = false;
 
     isPaused = false;
     pauseMenu.style.display = 'none';
@@ -1989,6 +1985,7 @@
     player.isClimbing = false;
     player.wallHitDir = 0;
     player.wallHitType = 3;
+    player.isWallJumping = false;
     player.highestYInAir = player.y;
     player.onGround = true; 
     player.currentPlatform = null;
@@ -2008,6 +2005,8 @@
     
     baseQuat = [1, 0, 0, 0];
     tapTimes = [];
+    isPendingCalibration = false;
+    calibrationHoldStartTime = 0;
     isCalibrating = false;
     lastCalibrationSoundTime = 0;
     systemMessage = "";
@@ -2067,7 +2066,12 @@
     let useCSSFade = true;
 
     let bigFallElapsed = now - bigFallStartTime;
-    if (bigFallElapsed < 4500) {
+    
+    if (isCalibrating) {
+        activeMessage = "ジャイロの傾きを調整中...";
+        useCSSFade = true;
+        currentOpacity = 1;
+    } else if (bigFallElapsed < 4500) {
         activeMessage = currentBigFallMessage;
         useCSSFade = false; 
         messageBanner.style.transition = 'none';
@@ -2115,9 +2119,25 @@
     let isBigFallConfused = player.bigFallPenaltyEndTime > now;
     let isNormalConfused = player.confusionEndTime > now;
 
+    // --- 長押し判定（1秒でキャリブレーション移行、およびキャンセル処理） ---
+    if (isPendingCalibration) {
+        // 待機中に条件を満たさなくなったらキャンセル
+        if (!player.onGround || Math.abs(tilt) >= 10 || isPointerDown === false || (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now)) {
+            isPendingCalibration = false;
+        } else if (now - calibrationHoldStartTime >= 1000) {
+            isCalibrating = true;
+            isPendingCalibration = false;
+            lastCalibrationSoundTime = 0; 
+        }
+    }
+
+    // 調整中に足場から落ちたらキャンセル
+    if (isCalibrating && !player.onGround) {
+        isCalibrating = false;
+    }
+
     if (isPointerDown && !isPressing) {
-       // キャリブレーション中はチャージ開始をブロック
-       if (!isNormalConfused && !isBigFallConfused && now - lastReleaseTime >= 300 && !isCalibrating) {
+       if (!isNormalConfused && !isBigFallConfused && now - lastReleaseTime >= 300 && !isCalibrating && !isPendingCalibration) {
            isPressing = true;
            pressStartTime = now;
            lastChargeSoundTime = now; 
@@ -2133,13 +2153,8 @@
 
     // --- 物理演算・移動処理 ---
     if (isCalibrating) {
-        // キャリブレーション中は停止して震える
-        player.vx = 0;
-        player.vy = 0;
-        player.airVx = 0;
         isPressing = false; 
-        
-        if (now - lastCalibrationSoundTime >= 1000) {
+        if (now - lastCalibrationSoundTime >= 250) {
             playSePurupuru();
             lastCalibrationSoundTime = now;
         }
@@ -2167,6 +2182,7 @@
         player.wallHitDir = 0;
         player.vx = 0; 
         player.hasPlayedFallSound = false; 
+        player.isWallJumping = false; 
       }
     } else if (hitStopEndTime > now) {
       player.vx = 0; 
@@ -2199,11 +2215,14 @@
       
       let activeTilt = effectiveTilt * tiltMult;
       
-      if (isBigFallConfused) {
-          activeTilt = -effectiveTilt * 0.85; 
-      } else if (isNormalConfused) {
-          let confMult = (inTutorial && !IS_TEST_MODE) ? 1.1 : 1.3;
-          activeTilt = -effectiveTilt * confMult;
+      // 混乱時は純粋にジャイロ速度を反転（倍率1.0）
+      if (isBigFallConfused || isNormalConfused) {
+          activeTilt = -effectiveTilt * 1.0; 
+      }
+
+      // キャリブレーションの待機・実行中はジャイロ入力を無効化（足場の影響slipTiltは残る）
+      if (isCalibrating || isPendingCalibration) {
+          activeTilt = 0;
       }
 
       activeTilt += slipTilt;
@@ -2401,12 +2420,12 @@
               if (!wasOnGround) {
                   if (player.isBigFalling) {
                       playSeCrash();
-                      hitStopEndTime = now + 300;
-                      player.hitStopCooldownEndTime = now + 500;
+                      hitStopEndTime = now + 500; 
+                      player.hitStopCooldownEndTime = now + 700;
                       player.wallHitDir = 2; 
                       player.vx = 0; 
                       
-                      player.bigFallPenaltyEndTime = now + 1500; 
+                      player.bigFallPenaltyEndTime = now + 1000; 
                       
                       bigFallStartTime = now;
                       currentBigFallMessage = bigFallMessages[Math.floor(Math.random() * bigFallMessages.length)];
@@ -2429,6 +2448,7 @@
               player.isBigFalling = false;
               player.lastJumpChargeTime = 0; 
               player.hasPlayedFallSound = false; 
+              player.isWallJumping = false; 
             } 
             else if (hitFromBelow && player.vy < 0) {
               let hitLeftEdge = (shapeRight >= p.x && shapeRight <= p.x + 5);
@@ -2466,15 +2486,17 @@
                   
                   if (!wasOnGround) {
                       if (distFromStart >= player.size) {
-                          if (player.lastJumpChargeTime >= 1100) {
+                          // 壁ジャンプ直後、または溜めジャンプからの天井激突（ペナルティ統一）
+                          if (player.isWallJumping || player.lastJumpChargeTime >= 1100) {
                               playSeHitHeavy();
-                              player.confusionEndTime = now + 1500;
+                              player.confusionEndTime = now + 1000; 
                               if (player.hitStopCooldownEndTime <= now) {
-                                  hitStopEndTime = now + 300;
-                                  player.hitStopCooldownEndTime = now + 500;
+                                  hitStopEndTime = now + 500; 
+                                  player.hitStopCooldownEndTime = now + 700;
                                   player.wallHitDir = 0; 
                                   player.wallHitPlatform = p;
                               }
+                              player.isWallJumping = false; 
                           } else {
                               playSeHitLight();
                               if (player.hitStopCooldownEndTime <= now) {
@@ -2758,7 +2780,7 @@
     let purupuruY = 0;
     if (isCalibrating) {
         let cycle = now - lastCalibrationSoundTime;
-        if (cycle < 500) { 
+        if (cycle < 125) { 
             purupuruX = (Math.random() - 0.5) * 6;
             purupuruY = (Math.random() - 0.5) * 6;
         }
