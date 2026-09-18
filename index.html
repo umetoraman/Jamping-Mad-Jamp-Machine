@@ -1132,24 +1132,48 @@
       }
   }
 
-  function drawSlime(ctx, sw, sh, isCharging, tremble, bend = 0) {
+  function drawSlime(ctx, sw, sh, isCharging, tremble, bend = 0, tiltY = 0) {
       ctx.beginPath();
       let baseW = sw * 0.35; 
       let midW = sw * 0.65;
       let topY = -sh * 0.85;
       
-      if (isCharging) {
-          topY = -sh * 0.5 + tremble;
-          midW = sw * 0.75 + tremble;
+      if (!isCharging) {
+          if (tiltY < -20) {
+              topY = -sh * 1.15;
+              midW = sw * 0.55;
+          } else if (tiltY < -5) {
+              topY = -sh * 1.0;
+              midW = sw * 0.60;
+          } else if (tiltY > 20) {
+              topY = -sh * 0.5;
+              midW = sw * 0.75;
+          } else if (tiltY > 5) {
+              topY = -sh * 0.65;
+              midW = sw * 0.70;
+          }
       }
       
       let tx = (x, y) => x + bend * Math.pow(y / topY, 2) * sw * 0.5;
       let ty = (x, y) => y;
 
-      ctx.moveTo(tx(-baseW, 0), ty(-baseW, 0)); 
-      ctx.bezierCurveTo(tx(-midW, 0), ty(-midW, 0), tx(-midW, topY), ty(-midW, topY), tx(0, topY), ty(0, topY));
-      ctx.bezierCurveTo(tx(midW, topY), ty(midW, topY), tx(midW, 0), ty(midW, 0), tx(baseW, 0), ty(baseW, 0));
-      ctx.quadraticCurveTo(tx(0, sh * 0.05), ty(0, sh * 0.05), tx(-baseW, 0), ty(-baseW, 0));
+      if (isCharging) {
+          let cTopY = -sh * 0.4 + tremble; 
+          let sideY = -sh * 0.55 + tremble; 
+          let cMidW = sw * 0.8 + tremble; 
+          
+          ctx.moveTo(tx(-baseW, 0), ty(-baseW, 0)); 
+          ctx.bezierCurveTo(tx(-cMidW, 0), ty(-cMidW, 0), tx(-cMidW, sideY), ty(-cMidW, sideY), tx(-cMidW*0.5, sideY), ty(-cMidW*0.5, sideY));
+          ctx.bezierCurveTo(tx(-cMidW*0.2, sideY), ty(-cMidW*0.2, sideY), tx(-cMidW*0.2, cTopY), ty(-cMidW*0.2, cTopY), tx(0, cTopY), ty(0, cTopY));
+          ctx.bezierCurveTo(tx(cMidW*0.2, cTopY), ty(cMidW*0.2, cTopY), tx(cMidW*0.2, sideY), ty(cMidW*0.2, sideY), tx(cMidW*0.5, sideY), ty(cMidW*0.5, sideY));
+          ctx.bezierCurveTo(tx(cMidW, sideY), ty(cMidW, sideY), tx(cMidW, 0), ty(cMidW, 0), tx(baseW, 0), ty(baseW, 0));
+          ctx.quadraticCurveTo(tx(0, sh * 0.05), ty(0, sh * 0.05), tx(-baseW, 0), ty(-baseW, 0));
+      } else {
+          ctx.moveTo(tx(-baseW, 0), ty(-baseW, 0)); 
+          ctx.bezierCurveTo(tx(-midW, 0), ty(-midW, 0), tx(-midW, topY), ty(-midW, topY), tx(0, topY), ty(0, topY));
+          ctx.bezierCurveTo(tx(midW, topY), ty(midW, topY), tx(midW, 0), ty(midW, 0), tx(baseW, 0), ty(baseW, 0));
+          ctx.quadraticCurveTo(tx(0, sh * 0.05), ty(0, sh * 0.05), tx(-baseW, 0), ty(-baseW, 0));
+      }
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -1552,6 +1576,86 @@
         addPlatformToChunk(pObjs[i]);
     }
 
+    if (!IS_TEST_MODE && !isTutorial && Math.random() < 0.25) {
+        let tryDir = Math.random() < 0.5 ? -1 : 1;
+        let extraMult = getPlatformWidthMult(false);
+        let extraW = player.size * extraMult;
+        let gap = 32 + Math.random() * 64; 
+        
+        let extraStartX;
+        let canPlace = false;
+        
+        if (tryDir === -1) {
+            let aLeft = pObjs[0].x;
+            extraStartX = aLeft - gap - extraW;
+            if (extraStartX >= LIMIT_LEFT) {
+                canPlace = true;
+            } else {
+                tryDir = 1;
+            }
+        }
+        if (tryDir === 1 && !canPlace) {
+            let originalLast = pObjs[pObjs.length - 1];
+            let aRight = originalLast.x + originalLast.w;
+            extraStartX = aRight + gap;
+            if (extraStartX + extraW <= LIMIT_RIGHT) {
+                canPlace = true;
+            }
+        }
+        
+        if (canPlace) {
+            let partsB = generateSlopeParts(extraW, false);
+            let cx = extraStartX;
+            let cy = y;
+            let extraPObjs = [];
+            for (let part of partsB) {
+                let partW = extraW * part.wMult;
+                let slopeTan = Math.tan(part.slope * Math.PI / 180);
+                
+                if (cx < LIMIT_RIGHT && cx + partW > LIMIT_LEFT) {
+                    let drawLeft = Math.max(LIMIT_LEFT, cx);
+                    let drawRight = Math.min(LIMIT_RIGHT, cx + partW);
+                    let drawW = drawRight - drawLeft;
+                    let drawY = cy + (drawLeft - cx) * slopeTan;
+                    
+                    if (drawW > 0) {
+                        let pObj = { x: drawLeft, y: drawY, w: drawW, h: 20, isSafety: false, friction: 85, slope: part.slope };
+                        if (drawW >= 32 && Math.random() < 0.08) {
+                            let altMeters = Math.max(0, Math.floor((startZeroAltY - drawY) / PIXELS_PER_METER));
+                            pObj.chest = { type: getChestType(altMeters), x: drawLeft + drawW / 2, opened: false };
+                        }
+                        extraPObjs.push(pObj);
+                        
+                        aabbMinX = Math.min(aabbMinX, drawLeft);
+                        aabbMaxX = Math.max(aabbMaxX, drawRight);
+                        aabbMinY = Math.min(aabbMinY, drawY, drawY + drawW * slopeTan);
+                        aabbMaxY = Math.max(aabbMaxY, drawY + 20, drawY + drawW * slopeTan + 20);
+                    }
+                }
+                cx += partW;
+                cy += partW * slopeTan;
+            }
+            
+            for (let i = 0; i < extraPObjs.length; i++) {
+                extraPObjs[i].isLeftConnected = (i > 0);
+                extraPObjs[i].isRightConnected = (i < extraPObjs.length - 1);
+                
+                let sCurrent = extraPObjs[i].slope || 0;
+                let rad = Math.PI / 180;
+                
+                extraPObjs[i].offsetLeft = extraPObjs[i].isLeftConnected 
+                    ? -extraPObjs[i].h * Math.tan(((extraPObjs[i-1].slope || 0) + sCurrent) / 2 * rad) 
+                    : 0;
+                extraPObjs[i].offsetRight = extraPObjs[i].isRightConnected 
+                    ? -extraPObjs[i].h * Math.tan((sCurrent + (extraPObjs[i+1].slope || 0)) / 2 * rad) 
+                    : 0;
+                
+                pObjs.push(extraPObjs[i]);
+                addPlatformToChunk(extraPObjs[i]);
+            }
+        }
+    }
+
     let fP = pObjs[0];
     let lP = pObjs[pObjs.length - 1];
     return { 
@@ -1652,10 +1756,9 @@
     
     if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
         
-        let isTiltedAway = (player.wallHitDir === 1 && tilt < -3) || (player.wallHitDir === -1 && tilt > 3);
+        let isTiltedAway = (player.wallHitDir === 1 && tilt < 0) || (player.wallHitDir === -1 && tilt > 0);
 
         if (isTiltedAway) {
-            // --- 壁ジャンプの実行 ---
             let jumpX = tilt * player.speed * 1.0; 
             let yAngle = Math.max(0, -tiltY); 
             let jumpY = -yAngle * player.speed * 1.15; 
@@ -1681,7 +1784,6 @@
             
             playSeJump();
         } else {
-            // --- 通常のよじ登りの実行 ---
             player.isClimbing = true;
             player.climbStartTime = now;
             
@@ -1720,7 +1822,6 @@
     if (isPressing) {
       isPressing = false;
       if (player.isClimbing) {
-        // よじ登り動作中はジャンプを作動させずチャージをリセット
         pressStartTime = 0;
         player.lastJumpChargeTime = 0;
       } else if (player.onGround && hitStopEndTime <= Date.now()) {
@@ -1752,28 +1853,23 @@
     }
   }
 
-  // --- タップイベント ---
   window.addEventListener('touchstart', (e) => {
       if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#pauseBtn') || e.target.closest('#pauseMenu')) return;
       isPointerDown = true;
       
       const now = Date.now();
       
-      // 1. 真っ先に壁激突ディレイ中の処理を判定（よじ登り・壁ジャンプを最優先）
       if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
           startAction(); 
           tapTimes = []; 
           return; 
       }
       
-      // 2. それ以外の場合のみ、キャリブレーション用のタップカウントを行う
       tapTimes.push(now);
       tapTimes = tapTimes.filter(t => now - t <= 1000); 
       
-      // 1秒間に2回タップで待機状態へ
       if (tapTimes.length >= 2) {
           let isConfused = (player.confusionEndTime > now) || (player.bigFallPenaltyEndTime > now);
-          // 地上かつ混乱状態ではなく、左右の傾きが15度未満の場合のみ待機状態へ
           if (player.onGround && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 15 && player.wallHitDir === 0) {
               isPendingCalibration = true;
               calibrationHoldStartTime = now;
@@ -2129,7 +2225,6 @@
     let isBigFallConfused = player.bigFallPenaltyEndTime > now;
     let isNormalConfused = player.confusionEndTime > now;
 
-    // --- 長押し判定（1秒でキャリブレーション移行、およびキャンセル処理） ---
     if (isPendingCalibration) {
         if (!player.onGround || Math.abs(tilt) >= 15 || isPointerDown === false || (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now)) {
             isPendingCalibration = false;
@@ -2159,7 +2254,6 @@
         }
     }
 
-    // --- 物理演算・移動処理 ---
     if (isCalibrating) {
         isPressing = false; 
         if (now - lastCalibrationSoundTime >= 250) {
@@ -2820,7 +2914,7 @@
             ctx.globalAlpha = 1.0; 
             ctx.fillText("🖐️", localIconX, localIconY);
         } else {
-            let isTiltedAway = (player.wallHitDir === 1 && tilt < -3) || (player.wallHitDir === -1 && tilt > 3);
+            let isTiltedAway = (player.wallHitDir === 1 && tilt < 0) || (player.wallHitDir === -1 && tilt > 0);
             let iconStr = isTiltedAway ? "👟" : "🖐️";
 
             ctx.font = "20px 'DotGothic16', sans-serif";
@@ -2854,7 +2948,7 @@
         ctx.rotate(climbAngle);
         
         let tremble = isPressing ? (Math.random() - 0.5) * 3 : 0;
-        drawSlime(ctx, sw, sh, isPressing, tremble);
+        drawSlime(ctx, sw, sh, isPressing, tremble, 0, tiltY);
         
     } else if (isLeftBonk || isRightBonk) {
         let pType = player.wallHitType;
@@ -2867,7 +2961,7 @@
         let wallAngle = (player.wallHitDir === 1) ? -Math.PI / 2 : Math.PI / 2;
         ctx.rotate(wallAngle);
 
-        drawSlime(ctx, sw, sh, false, 0, bend);
+        drawSlime(ctx, sw, sh, false, 0, bend, tiltY);
         
     } else if (isCeilingBonk || isFloorBonk) {
         ctx.translate(0, -sh/2);
@@ -2904,7 +2998,12 @@
         let groundSlope = (player.currentPlatform && player.currentPlatform.slope) ? player.currentPlatform.slope * Math.PI / 180 : 0;
         ctx.rotate(groundSlope);
         
-        drawSlime(ctx, sw, sh, true, tremble);
+        if (Math.abs(player.vx) > 0.1) {
+            let lean = -Math.min(Math.max(player.vx * 0.05, -0.4), 0.4); 
+            ctx.transform(1, 0, lean, 1, 0, 0); 
+        }
+        
+        drawSlime(ctx, sw, sh, true, tremble, 0, tiltY);
         
     } else {
         let groundSlope = (player.currentPlatform && player.currentPlatform.slope) ? player.currentPlatform.slope * Math.PI / 180 : 0;
@@ -2917,7 +3016,7 @@
             ctx.scale(1.0 - bounce, 1.0 + bounce);
         }
         
-        drawSlime(ctx, sw, sh, false, 0);
+        drawSlime(ctx, sw, sh, false, 0, 0, tiltY);
     }
 
     ctx.restore();
