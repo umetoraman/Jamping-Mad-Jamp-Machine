@@ -286,7 +286,7 @@
   <h1 id="titleText">Jumping Mad<br>Jump Machine</h1>
   <p>
     📱 傾きで移動 / 👆 画面長押しでジャンプ<br>
-    ※1秒間に3回タップでジャイロの基準位置リセット<br>
+    ※1秒間に2回タップでジャイロの基準位置リセット<br>
     頭を打つと操作が反転＆溜めができなくなります。
   </p>
   <button id="startBtn" class="start-btn">スタート</button>
@@ -736,6 +736,7 @@
     confusionEndTime: 0,
     hitStopCooldownEndTime: 0,
     bigFallPenaltyEndTime: 0, 
+    pendingCeilingConfusion: false, 
     highestYInAir: 0,
     
     jumpStartX: width / 2,
@@ -1322,7 +1323,7 @@
     initialSigns = [
       { x: width * 0.15 - 20, y: startGroundY, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
       { x: width * 0.38 - 20, y: startGroundY, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
-      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に3回タップし、\n3回目を1秒長押しするとジャイロを調整します。" },
+      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に2回タップし、\n2回目を1秒長押しするとジャイロを調整します。" },
       { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかったら画面をタップで\n足場によじ登ります！\n👟 壁の反対へ傾けてタップで壁ジャンプ！" }
     ];
   }
@@ -1747,29 +1748,34 @@
     }
   }
 
-  // --- タップイベント（長押しキャリブレーション対応） ---
+  // --- タップイベント（優先順位の修正とキャリブレーション無効化） ---
   window.addEventListener('touchstart', (e) => {
       if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#pauseBtn') || e.target.closest('#pauseMenu')) return;
       isPointerDown = true;
       
       const now = Date.now();
       
-      tapTimes.push(now);
-      tapTimes = tapTimes.filter(t => now - t <= 1000); 
-      
-      if (tapTimes.length >= 3) {
-          let isConfused = (player.confusionEndTime > now) || (player.bigFallPenaltyEndTime > now);
-          // 地上かつ混乱状態ではなく、左右の傾きが10度未満の場合のみ待機状態へ
-          if (player.onGround && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 10) {
-              isPendingCalibration = true;
-              calibrationHoldStartTime = now;
-          }
+      // 1. 真っ先に壁激突ディレイ中の処理を判定（よじ登り・壁ジャンプを最優先）
+      // ※壁接触時はキャリブレーションを完全に廃止し、タップで確実によじ登り・壁ジャンプが発動するように保護
+      if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
+          startAction(); 
           tapTimes = []; 
           return; 
       }
       
-      if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
-          startAction(); 
+      // 2. それ以外の場合のみ、キャリブレーション用のタップカウントを行う
+      tapTimes.push(now);
+      tapTimes = tapTimes.filter(t => now - t <= 1000); 
+      
+      // 1秒間に2回タップで待機状態へ（壁接触時は上のreturnで弾かれるためここには来ない）
+      if (tapTimes.length >= 2) {
+          let isConfused = (player.confusionEndTime > now) || (player.bigFallPenaltyEndTime > now);
+          // 地上かつ混乱状態ではなく、左右の傾きが10度未満の場合のみ待機状態へ
+          if (player.onGround && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 10 && player.wallHitDir === 0) {
+              isPendingCalibration = true;
+              calibrationHoldStartTime = now;
+          }
+          tapTimes = []; 
       }
   }, {passive: false});
 
@@ -2001,6 +2007,7 @@
     player.confusionEndTime = 0;
     player.hitStopCooldownEndTime = 0;
     player.bigFallPenaltyEndTime = 0; 
+    player.pendingCeilingConfusion = false; 
     bigFallStartTime = 0; 
     
     baseQuat = [1, 0, 0, 0];
@@ -2121,7 +2128,6 @@
 
     // --- 長押し判定（1秒でキャリブレーション移行、およびキャンセル処理） ---
     if (isPendingCalibration) {
-        // 待機中に条件を満たさなくなったらキャンセル
         if (!player.onGround || Math.abs(tilt) >= 10 || isPointerDown === false || (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now)) {
             isPendingCalibration = false;
         } else if (now - calibrationHoldStartTime >= 1000) {
@@ -2131,7 +2137,6 @@
         }
     }
 
-    // 調整中に足場から落ちたらキャンセル
     if (isCalibrating && !player.onGround) {
         isCalibrating = false;
     }
@@ -2215,12 +2220,10 @@
       
       let activeTilt = effectiveTilt * tiltMult;
       
-      // 混乱時は純粋にジャイロ速度を反転（倍率1.0）
       if (isBigFallConfused || isNormalConfused) {
           activeTilt = -effectiveTilt * 1.0; 
       }
 
-      // キャリブレーションの待機・実行中はジャイロ入力を無効化（足場の影響slipTiltは残る）
       if (isCalibrating || isPendingCalibration) {
           activeTilt = 0;
       }
@@ -2425,13 +2428,19 @@
                       player.wallHitDir = 2; 
                       player.vx = 0; 
                       
-                      player.bigFallPenaltyEndTime = now + 1000; 
+                      player.bigFallPenaltyEndTime = now + 1500; 
+                      player.pendingCeilingConfusion = false; 
                       
                       bigFallStartTime = now;
                       currentBigFallMessage = bigFallMessages[Math.floor(Math.random() * bigFallMessages.length)];
                   } else {
                       if (player.vy > 2 || distFromStart >= player.size) {
                           playSeHitLight();
+                      }
+                      
+                      if (player.pendingCeilingConfusion) {
+                          player.confusionEndTime = now + 1000;
+                          player.pendingCeilingConfusion = false;
                       }
                   }
               }
@@ -2486,10 +2495,9 @@
                   
                   if (!wasOnGround) {
                       if (distFromStart >= player.size) {
-                          // 壁ジャンプ直後、または溜めジャンプからの天井激突（ペナルティ統一）
                           if (player.isWallJumping || player.lastJumpChargeTime >= 1100) {
                               playSeHitHeavy();
-                              player.confusionEndTime = now + 1000; 
+                              player.pendingCeilingConfusion = true; 
                               if (player.hitStopCooldownEndTime <= now) {
                                   hitStopEndTime = now + 500; 
                                   player.hitStopCooldownEndTime = now + 700;
@@ -2775,7 +2783,6 @@
         }
     }
 
-    // --- キャリブレーション中のプルプル描画 ---
     let purupuruX = 0;
     let purupuruY = 0;
     if (isCalibrating) {
