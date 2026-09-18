@@ -782,6 +782,7 @@
       ctx.fill();
   }
 
+  // --- 塔の背景キャッシュ生成処理（隙間対策付き） ---
   function renderTowerChunkToCache(idx) {
       let chunkBottomY = startZeroAltY - idx * CHUNK_HEIGHT_PX;
       let chunkTopY = chunkBottomY - CHUNK_HEIGHT_PX;
@@ -796,12 +797,15 @@
       
       let canvas = document.createElement('canvas');
       canvas.width = towerWidth;
-      canvas.height = CHUNK_HEIGHT_PX;
-      let ctx = canvas.getContext('2d');
       
+      // idx === 0（一番下のチャンク）の場合のみ、地面（startGroundY）まで届くよう高さを延長
+      let extraH = (idx === 0) ? (startGroundY - startZeroAltY) : 0;
+      canvas.height = CHUNK_HEIGHT_PX + extraH;
+      
+      let ctx = canvas.getContext('2d');
       ctx.translate(-towerLeft, -chunkTopY);
       
-      let drawBottom = Math.min(chunkBottomY, startGroundY);
+      let drawBottom = chunkBottomY + extraH;
       
       ctx.lineWidth = 2;
       
@@ -1082,7 +1086,6 @@
   }
 
   function manageCaches(currentChunkIndex) {
-      // 足場のキャッシュ破棄
       for (let idxStr in chunks) {
           let idx = parseInt(idxStr);
           if (idx < currentChunkIndex - 2 || idx > currentChunkIndex + 2) {
@@ -1093,7 +1096,6 @@
           }
       }
       
-      // 塔の背景キャッシュ破棄
       for (let idxStr in towerCaches) {
           let idx = parseInt(idxStr);
           if (idx < currentChunkIndex - 2 || idx > currentChunkIndex + 2) {
@@ -1628,7 +1630,8 @@
         if (isTiltedAway) {
             // --- 壁ジャンプの実行 ---
             let jumpX = tilt * player.speed * 1.0; 
-            let yAngle = Math.max(0, tiltY); // Y座標で0を下回っていた場合はX方向にのみ
+            // tiltYは奥に傾けるとマイナス。奥に傾けた分だけ上方向(マイナス)のジャンプ力を得る
+            let yAngle = Math.max(0, -tiltY); 
             let jumpY = -yAngle * player.speed * 1.15; // 上向きのためマイナス
             
             player.vx = jumpX;
