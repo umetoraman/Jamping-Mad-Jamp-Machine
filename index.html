@@ -286,7 +286,7 @@
   <h1 id="titleText">Jumping Mad<br>Jump Machine</h1>
   <p>
     📱 傾きで移動 / 👆 画面長押しでジャンプ<br>
-    ※1秒間に3回タップでジャイロの基準位置リセット<br>
+    ※1秒間に2回タップでジャイロの基準位置リセット<br>
     頭を打つと操作が反転＆溜めができなくなります。
   </p>
   <button id="startBtn" class="start-btn">スタート</button>
@@ -726,7 +726,7 @@
     climbStartX: 0,
     climbTargetY: 0,
     climbTargetX: 0,
-    climbDuration: 800, 
+    climbDuration: 300, 
     
     wallHitDir: 0, 
     wallHitPlatform: null,
@@ -1323,7 +1323,7 @@
     initialSigns = [
       { x: width * 0.15 - 20, y: startGroundY, message: "📱 【移動】\nスマホを左右に傾けると移動します。\n傾き加減でスピードも変化！" },
       { x: width * 0.38 - 20, y: startGroundY, message: "👆 【ジャンプ】\n画面を長押しして離すとジャンプ！\n溜める時間でジャンプの高さが変わります。" },
-      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に3回タップし、\n3回目を1秒長押しするとジャイロを調整します。" },
+      { x: width * 0.62 + 20, y: startGroundY, message: "💫 【キャリブレーション】\n地上で1秒間に2回タップし、\n2回目を1秒長押しするとジャイロを調整します。" },
       { x: width * 0.85 + 20, y: startGroundY, message: "🖐️ 【よじ登り】\n壁にぶつかったら画面をタップで\n足場によじ登ります！\n👟 壁の反対へ傾けてタップで壁ジャンプ！" }
     ];
   }
@@ -1685,7 +1685,7 @@
             player.isClimbing = true;
             player.climbStartTime = now;
             
-            let cDur = 800; 
+            let cDur = 300; 
             
             player.climbDuration = cDur;
             player.climbEndTime = now + cDur; 
@@ -1719,7 +1719,11 @@
 
     if (isPressing) {
       isPressing = false;
-      if ((player.onGround || player.isClimbing) && hitStopEndTime <= Date.now()) {
+      if (player.isClimbing) {
+        // よじ登り動作中はジャンプを作動させずチャージをリセット
+        pressStartTime = 0;
+        player.lastJumpChargeTime = 0;
+      } else if (player.onGround && hitStopEndTime <= Date.now()) {
         const pressDuration = Date.now() - pressStartTime;
         const maxTicks = 20; 
         let ticks = Math.floor(pressDuration / 100);
@@ -1759,8 +1763,6 @@
       if (hitStopEndTime > now && player.wallHitPlatform && (player.wallHitDir === 1 || player.wallHitDir === -1)) {
           startAction(); 
           tapTimes = []; 
-          // タップ直後の意図しないチャージ開始を防ぎ、解放時のジャンプ暴発（落下）を防止する
-          lastReleaseTime = now; 
           return; 
       }
       
@@ -1768,8 +1770,8 @@
       tapTimes.push(now);
       tapTimes = tapTimes.filter(t => now - t <= 1000); 
       
-      // 1秒間に3回タップで待機状態へ
-      if (tapTimes.length >= 3) {
+      // 1秒間に2回タップで待機状態へ
+      if (tapTimes.length >= 2) {
           let isConfused = (player.confusionEndTime > now) || (player.bigFallPenaltyEndTime > now);
           // 地上かつ混乱状態ではなく、左右の傾きが15度未満の場合のみ待機状態へ
           if (player.onGround && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 15 && player.wallHitDir === 0) {
