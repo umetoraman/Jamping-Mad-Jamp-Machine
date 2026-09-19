@@ -1356,8 +1356,7 @@
       let sizeRand = Math.random();
       let mult;
       if (isTutorial && !IS_TEST_MODE) {
-          if (sizeRand < 0.80) { mult = 2.1 + Math.random() * 2.9; } 
-          else { mult = 5.1 + Math.random() * 0.9; }
+          mult = 4.0 + Math.random() * 2.0; 
       } else {
           if (sizeRand < 0.05) { mult = 1.0; } 
           else if (sizeRand < 0.30) { mult = 1.1 + Math.random() * 0.9; } 
@@ -1368,20 +1367,37 @@
   }
 
   function generateSlopeParts(totalW, isTutorial) {
-      if (!IS_TEST_MODE) {
-          if (isTutorial || totalW < 96 || Math.random() >= 0.30) {
-              return [{ wMult: 1.0, slope: 0 }];
+      if (!IS_TEST_MODE && isTutorial) {
+          if (totalW >= 128 && Math.random() < 0.40) { 
+              return [
+                  { wMult: 0.35, slope: 0 }, 
+                  { wMult: 0.30, isGap: true }, 
+                  { wMult: 0.35, slope: 0 }
+              ];
           }
+          return [{ wMult: 1.0, slope: 0 }];
       }
+      
+      if (!IS_TEST_MODE && (totalW < 96 || Math.random() >= 0.30)) {
+           return [{ wMult: 1.0, slope: 0 }];
+      }
+
       let deg = (Math.floor(Math.random() * 4) + 1) * 3; 
       let sign = Math.random() < 0.5 ? 1 : -1;
-      let type = Math.floor(Math.random() * 4);
+      let maxType = totalW >= 128 ? 5 : 4;
+      let type = Math.floor(Math.random() * maxType);
       
       switch(type) {
           case 0: return [{ wMult: 1.0, slope: sign * deg }];
           case 1: return [{ wMult: 0.5, slope: sign * deg }, { wMult: 0.5, slope: 0 }];
           case 2: return [{ wMult: 0.5, slope: 0 }, { wMult: 0.5, slope: sign * deg }];
           case 3: return [{ wMult: 0.5, slope: -sign * deg }, { wMult: 0.5, slope: sign * deg }];
+          case 4: 
+              return [
+                  { wMult: 0.35, slope: 0 }, 
+                  { wMult: 0.30, isGap: true }, 
+                  { wMult: 0.35, slope: 0 }
+              ];
           default: return [{ wMult: 1.0, slope: sign * deg }];
       }
   }
@@ -1514,7 +1530,13 @@
     let pObjs = [];
     for (let part of parts) {
         let partW = pw * part.wMult;
-        let slopeTan = Math.tan(part.slope * Math.PI / 180);
+        let slopeTan = part.slope ? Math.tan(part.slope * Math.PI / 180) : 0;
+        
+        if (part.isGap) {
+            currentPx += partW;
+            continue;
+        }
+        
         let partLeft = currentPx;
         let partRight = currentPx + partW;
         
@@ -1560,100 +1582,32 @@
     }
     
     for (let i = 0; i < pObjs.length; i++) {
-        pObjs[i].isLeftConnected = (i > 0);
-        pObjs[i].isRightConnected = (i < pObjs.length - 1);
+        let leftConnected = false;
+        if (i > 0) {
+            let prevP = pObjs[i-1];
+            if (Math.abs(pObjs[i].x - (prevP.x + prevP.w)) < 1.0) leftConnected = true;
+        }
+        
+        let rightConnected = false;
+        if (i < pObjs.length - 1) {
+            let nextP = pObjs[i+1];
+            if (Math.abs(nextP.x - (pObjs[i].x + pObjs[i].w)) < 1.0) rightConnected = true;
+        }
+
+        pObjs[i].isLeftConnected = leftConnected;
+        pObjs[i].isRightConnected = rightConnected;
         
         let sCurrent = pObjs[i].slope || 0;
         let rad = Math.PI / 180;
         
-        pObjs[i].offsetLeft = pObjs[i].isLeftConnected 
+        pObjs[i].offsetLeft = leftConnected 
             ? -pObjs[i].h * Math.tan(((pObjs[i-1].slope || 0) + sCurrent) / 2 * rad) 
             : 0;
-        pObjs[i].offsetRight = pObjs[i].isRightConnected 
+        pObjs[i].offsetRight = rightConnected 
             ? -pObjs[i].h * Math.tan((sCurrent + (pObjs[i+1].slope || 0)) / 2 * rad) 
             : 0;
             
         addPlatformToChunk(pObjs[i]);
-    }
-
-    if (!IS_TEST_MODE && Math.random() < 0.25) {
-        let tryDir = Math.random() < 0.5 ? -1 : 1;
-        let extraMult = getPlatformWidthMult(isTutorial);
-        let extraW = player.size * extraMult;
-        let gap = 32 + Math.random() * 64; 
-        
-        let extraStartX;
-        let canPlace = false;
-        
-        if (tryDir === -1) {
-            let aLeft = pObjs[0].x;
-            extraStartX = aLeft - gap - extraW;
-            if (extraStartX >= LIMIT_LEFT) {
-                canPlace = true;
-            } else {
-                tryDir = 1;
-            }
-        }
-        if (tryDir === 1 && !canPlace) {
-            let originalLast = pObjs[pObjs.length - 1];
-            let aRight = originalLast.x + originalLast.w;
-            extraStartX = aRight + gap;
-            if (extraStartX + extraW <= LIMIT_RIGHT) {
-                canPlace = true;
-            }
-        }
-        
-        if (canPlace) {
-            let partsB = generateSlopeParts(extraW, isTutorial);
-            let cx = extraStartX;
-            let cy = y;
-            let extraPObjs = [];
-            for (let part of partsB) {
-                let partW = extraW * part.wMult;
-                let slopeTan = Math.tan(part.slope * Math.PI / 180);
-                
-                if (cx < LIMIT_RIGHT && cx + partW > LIMIT_LEFT) {
-                    let drawLeft = Math.max(LIMIT_LEFT, cx);
-                    let drawRight = Math.min(LIMIT_RIGHT, cx + partW);
-                    let drawW = drawRight - drawLeft;
-                    let drawY = cy + (drawLeft - cx) * slopeTan;
-                    
-                    if (drawW > 0) {
-                        let pObj = { x: drawLeft, y: drawY, w: drawW, h: 20, isSafety: false, friction: 85, slope: part.slope };
-                        if (drawW >= 32 && Math.random() < 0.08) {
-                            let altMeters = Math.max(0, Math.floor((startZeroAltY - drawY) / PIXELS_PER_METER));
-                            pObj.chest = { type: getChestType(altMeters), x: drawLeft + drawW / 2, opened: false };
-                        }
-                        extraPObjs.push(pObj);
-                        
-                        aabbMinX = Math.min(aabbMinX, drawLeft);
-                        aabbMaxX = Math.max(aabbMaxX, drawRight);
-                        aabbMinY = Math.min(aabbMinY, drawY, drawY + drawW * slopeTan);
-                        aabbMaxY = Math.max(aabbMaxY, drawY + 20, drawY + drawW * slopeTan + 20);
-                    }
-                }
-                cx += partW;
-                cy += partW * slopeTan;
-            }
-            
-            for (let i = 0; i < extraPObjs.length; i++) {
-                extraPObjs[i].isLeftConnected = (i > 0);
-                extraPObjs[i].isRightConnected = (i < extraPObjs.length - 1);
-                
-                let sCurrent = extraPObjs[i].slope || 0;
-                let rad = Math.PI / 180;
-                
-                extraPObjs[i].offsetLeft = extraPObjs[i].isLeftConnected 
-                    ? -extraPObjs[i].h * Math.tan(((extraPObjs[i-1].slope || 0) + sCurrent) / 2 * rad) 
-                    : 0;
-                extraPObjs[i].offsetRight = extraPObjs[i].isRightConnected 
-                    ? -extraPObjs[i].h * Math.tan((sCurrent + (extraPObjs[i+1].slope || 0)) / 2 * rad) 
-                    : 0;
-                
-                pObjs.push(extraPObjs[i]);
-                addPlatformToChunk(extraPObjs[i]);
-            }
-        }
     }
 
     let fP = pObjs[0];
