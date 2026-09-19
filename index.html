@@ -1576,9 +1576,9 @@
         addPlatformToChunk(pObjs[i]);
     }
 
-    if (!IS_TEST_MODE && !isTutorial && Math.random() < 0.25) {
+    if (!IS_TEST_MODE && Math.random() < 0.25) {
         let tryDir = Math.random() < 0.5 ? -1 : 1;
-        let extraMult = getPlatformWidthMult(false);
+        let extraMult = getPlatformWidthMult(isTutorial);
         let extraW = player.size * extraMult;
         let gap = 32 + Math.random() * 64; 
         
@@ -1604,7 +1604,7 @@
         }
         
         if (canPlace) {
-            let partsB = generateSlopeParts(extraW, false);
+            let partsB = generateSlopeParts(extraW, isTutorial);
             let cx = extraStartX;
             let cy = y;
             let extraPObjs = [];
@@ -1853,6 +1853,32 @@
     }
   }
 
+  function checkNearGround() {
+      if (player.onGround) return true;
+      let currentChunkIndex = getChunkIndexByY(player.y);
+      let activePlatforms = getActivePlatforms(currentChunkIndex);
+      let rMax = player.size * 0.95 / 2;
+      let shapeBottom = player.y + rMax;
+      let shapeLeft = player.x - rMax;
+      let shapeRight = player.x + rMax;
+
+      for (let p of activePlatforms) {
+          if (p.invisibleWall) continue;
+          let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
+          if (shapeRight > p.x && shapeLeft < p.x + p.w) {
+              let checkX = player.x;
+              if (checkX > p.x + p.w) checkX = p.x + p.w;
+              else if (checkX < p.x) checkX = p.x;
+              
+              let surfaceY = p.y + (checkX - p.x) * tan;
+              if (shapeBottom <= surfaceY && (surfaceY - shapeBottom) <= 10) {
+                  return true;
+              }
+          }
+      }
+      return false;
+  }
+
   window.addEventListener('touchstart', (e) => {
       if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#pauseBtn') || e.target.closest('#pauseMenu')) return;
       isPointerDown = true;
@@ -1870,7 +1896,7 @@
       
       if (tapTimes.length >= 2) {
           let isConfused = (player.confusionEndTime > now) || (player.bigFallPenaltyEndTime > now);
-          if (player.onGround && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 15 && player.wallHitDir === 0) {
+          if (checkNearGround() && hitStopEndTime <= now && !isConfused && Math.abs(tilt) < 15 && player.wallHitDir === 0) {
               isPendingCalibration = true;
               calibrationHoldStartTime = now;
           }
@@ -2226,7 +2252,7 @@
     let isNormalConfused = player.confusionEndTime > now;
 
     if (isPendingCalibration) {
-        if (!player.onGround || Math.abs(tilt) >= 15 || isPointerDown === false || (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now)) {
+        if (!checkNearGround() || Math.abs(tilt) >= 15 || isPointerDown === false || (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now)) {
             isPendingCalibration = false;
         } else if (now - calibrationHoldStartTime >= 1000) {
             isCalibrating = true;
@@ -2891,7 +2917,7 @@
     }
     ctx.translate(cx + purupuruX, cy + purupuruY);
 
-    if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now) {
+    if (player.confusionEndTime > now || player.bigFallPenaltyEndTime > now || player.pendingCeilingConfusion) {
         ctx.font = "16px 'DotGothic16', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
