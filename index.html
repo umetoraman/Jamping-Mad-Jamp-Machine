@@ -1102,8 +1102,8 @@
                       let colIdx = Math.floor(pRand(s2) * cols.length);
                       pCtx.fillStyle = cols[colIdx];
                       
-                      let drawY = -py - bh + 1;
-                      pCtx.fillRect(x + 1, drawY + 1, pDrawW - 2, bh - 2);
+                      let drawY = -py - bh + 2; 
+                      pCtx.fillRect(x + 1, drawY, pDrawW - 2, bh);
                       
                       pCtx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
                       pCtx.lineWidth = 2;
@@ -1816,7 +1816,7 @@
         if (isTiltedAway) {
             let jumpX = tilt * player.speed * 0.7; 
             let yAngle = Math.max(0, -tiltY); 
-            let jumpY = -yAngle * player.speed * 0.7; 
+            let jumpY = -yAngle * player.speed * 1.2; 
             
             player.vx = jumpX;
             player.airVx = jumpX;
@@ -3102,15 +3102,12 @@
 
     ctx.restore();
 
-    ctx.save();
-    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.parapetCanvas) {
             ctx.drawImage(p.parapetCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
         }
     }
-    ctx.restore();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i];
