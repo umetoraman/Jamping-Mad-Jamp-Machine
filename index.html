@@ -966,7 +966,7 @@
           minX = Math.min(0, oL, p.w, p.w + oR) - 30;
           maxX = Math.max(0, oL, p.w, p.w + oR) + 30;
           minY = Math.min(0, p.w * tan) - 60; 
-          maxY = Math.max(p.h, p.w * tan + p.h) + 30;
+          maxY = Math.max(p.h, p.w * tan + p.h) + 40;
       }
 
       let cW = Math.ceil(maxX - minX);
@@ -1647,7 +1647,7 @@
         }
         
         if (canPlace) {
-            let partsB = generateSlopeParts(extraW, false);
+            let partsB = generateSlopeParts(extraW, isTutorial);
             let cx = extraStartX;
             let cy = y;
             let extraPObjs = [];
@@ -3102,12 +3102,15 @@
 
     ctx.restore();
 
+    ctx.save();
+    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.parapetCanvas) {
             ctx.drawImage(p.parapetCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
         }
     }
+    ctx.restore();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i];
