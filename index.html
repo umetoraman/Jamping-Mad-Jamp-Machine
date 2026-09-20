@@ -1792,7 +1792,7 @@
         if (isTiltedAway) {
             let jumpX = tilt * player.speed * 0.7; 
             let yAngle = Math.max(0, -tiltY); 
-            let jumpY = -yAngle * player.speed * 0.84; 
+            let jumpY = -yAngle * player.speed * 1.2; 
             
             player.vx = jumpX;
             player.airVx = jumpX;
@@ -2588,7 +2588,7 @@
                       bigFallStartTime = now;
                       currentBigFallMessage = bigFallMessages[Math.floor(Math.random() * bigFallMessages.length)];
                   } else {
-                      if (player.vy > 2 || distFromStart >= player.size) {
+                      if (player.vy > 2 || distFromStart >= player.size || player.isWallJumping) {
                           playSeHitLight();
                       }
                       
@@ -2632,7 +2632,7 @@
                   player.airVx = 0;
                   player.vx = 0;
                   
-                  if (distFromStart >= player.size) {
+                  if (distFromStart >= player.size || player.isWallJumping) {
                       playSeHitLight();
                       let stunTime = 800; 
                       hitStopEndTime = now + stunTime; 
@@ -2695,7 +2695,7 @@
               player.vx = 0;
               
               if (!wasOnGround && player.hitStopCooldownEndTime <= now) {
-                  if (distFromStart >= player.size) {
+                  if (distFromStart >= player.size || player.isWallJumping) {
                       playSeHitLight();
                       
                       let stunTime = 800; 
