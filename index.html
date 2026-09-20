@@ -1102,7 +1102,7 @@
                       let colIdx = Math.floor(pRand(s2) * cols.length);
                       pCtx.fillStyle = cols[colIdx];
                       
-                      let drawY = -py - bh + 1;
+                      let drawY = -py - bh + 2; 
                       pCtx.fillRect(x + 1, drawY, pDrawW - 2, bh);
                       
                       pCtx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
@@ -1364,7 +1364,8 @@
       let sizeRand = Math.random();
       let mult;
       if (isTutorial && !IS_TEST_MODE) {
-          mult = 4.0 + Math.random() * 2.0; 
+          if (sizeRand < 0.80) { mult = 2.1 + Math.random() * 2.9; } 
+          else { mult = 5.1 + Math.random() * 0.9; }
       } else {
           if (sizeRand < 0.05) { mult = 1.0; } 
           else if (sizeRand < 0.30) { mult = 1.1 + Math.random() * 0.9; } 
@@ -1375,37 +1376,20 @@
   }
 
   function generateSlopeParts(totalW, isTutorial) {
-      if (!IS_TEST_MODE && isTutorial) {
-          if (totalW >= 128 && Math.random() < 0.15) { 
-              return [
-                  { wMult: 0.35, slope: 0 }, 
-                  { wMult: 0.30, isGap: true }, 
-                  { wMult: 0.35, slope: 0 }
-              ];
+      if (!IS_TEST_MODE) {
+          if (isTutorial || totalW < 96 || Math.random() >= 0.30) {
+              return [{ wMult: 1.0, slope: 0 }];
           }
-          return [{ wMult: 1.0, slope: 0 }];
       }
-      
-      if (!IS_TEST_MODE && (totalW < 96 || Math.random() >= 0.30)) {
-           return [{ wMult: 1.0, slope: 0 }];
-      }
-
       let deg = (Math.floor(Math.random() * 4) + 1) * 3; 
       let sign = Math.random() < 0.5 ? 1 : -1;
-      let maxType = totalW >= 128 ? 5 : 4;
-      let type = Math.floor(Math.random() * maxType);
+      let type = Math.floor(Math.random() * 4);
       
       switch(type) {
           case 0: return [{ wMult: 1.0, slope: sign * deg }];
           case 1: return [{ wMult: 0.5, slope: sign * deg }, { wMult: 0.5, slope: 0 }];
           case 2: return [{ wMult: 0.5, slope: 0 }, { wMult: 0.5, slope: sign * deg }];
           case 3: return [{ wMult: 0.5, slope: -sign * deg }, { wMult: 0.5, slope: sign * deg }];
-          case 4: 
-              return [
-                  { wMult: 0.35, slope: sign * deg }, 
-                  { wMult: 0.30, isGap: true }, 
-                  { wMult: 0.35, slope: sign * deg }
-              ];
           default: return [{ wMult: 1.0, slope: sign * deg }];
       }
   }
@@ -1816,7 +1800,7 @@
         if (isTiltedAway) {
             let jumpX = tilt * player.speed * 0.7; 
             let yAngle = Math.max(0, -tiltY); 
-            let jumpY = -yAngle * player.speed * 1.2; 
+            let jumpY = -yAngle * player.speed * 0.84; 
             
             player.vx = jumpX;
             player.airVx = jumpX;
@@ -3102,15 +3086,12 @@
 
     ctx.restore();
 
-    ctx.save();
-    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.parapetCanvas) {
             ctx.drawImage(p.parapetCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
         }
     }
-    ctx.restore();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i];
