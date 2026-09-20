@@ -1083,7 +1083,7 @@
 
               pCtx.save();
               pCtx.rotate(tan ? Math.atan(tan) : 0);
-              let parapetH = 36; 
+              let parapetH = 24; 
               let bW = 20;
               let pSeed = p.x * 5.1 + p.y * 3.3;
               
@@ -1102,7 +1102,7 @@
                       let colIdx = Math.floor(pRand(s2) * cols.length);
                       pCtx.fillStyle = cols[colIdx];
                       
-                      let drawY = -py - bh + 2; 
+                      let drawY = -py - bh + 1;
                       pCtx.fillRect(x + 1, drawY, pDrawW - 2, bh);
                       
                       pCtx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
@@ -3102,12 +3102,15 @@
 
     ctx.restore();
 
+    ctx.save();
+    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.parapetCanvas) {
             ctx.drawImage(p.parapetCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
         }
     }
+    ctx.restore();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i];
