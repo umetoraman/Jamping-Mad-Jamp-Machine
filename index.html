@@ -1385,34 +1385,27 @@
           }
           return [{ wMult: 1.0, slope: 0 }];
       }
-
-      let isParallel = (!IS_TEST_MODE && totalW >= 128 && Math.random() < 0.25); 
-
-      if (isParallel) {
-          let slopeA = Math.random() < 0.5 ? 0 : (Math.floor(Math.random() * 4) + 1) * 3 * (Math.random() < 0.5 ? 1 : -1);
-          let slopeB = Math.random() < 0.5 ? 0 : (Math.floor(Math.random() * 4) + 1) * 3 * (Math.random() < 0.5 ? 1 : -1);
-          let gapMult = 0.25 + Math.random() * 0.15; 
-          let sideMult = (1.0 - gapMult) / 2;
-          return [
-              { wMult: sideMult, slope: slopeA },
-              { wMult: gapMult, isGap: true },
-              { wMult: sideMult, slope: slopeB }
-          ];
-      }
       
-      if (!IS_TEST_MODE && (totalW < 96 || Math.random() >= 0.60)) {
+      if (!IS_TEST_MODE && (totalW < 96 || Math.random() >= 0.30)) {
            return [{ wMult: 1.0, slope: 0 }];
       }
 
       let deg = (Math.floor(Math.random() * 4) + 1) * 3; 
       let sign = Math.random() < 0.5 ? 1 : -1;
-      let type = Math.floor(Math.random() * 4);
+      let maxType = totalW >= 128 ? 5 : 4;
+      let type = Math.floor(Math.random() * maxType);
       
       switch(type) {
           case 0: return [{ wMult: 1.0, slope: sign * deg }];
           case 1: return [{ wMult: 0.5, slope: sign * deg }, { wMult: 0.5, slope: 0 }];
           case 2: return [{ wMult: 0.5, slope: 0 }, { wMult: 0.5, slope: sign * deg }];
           case 3: return [{ wMult: 0.5, slope: -sign * deg }, { wMult: 0.5, slope: sign * deg }];
+          case 4: 
+              return [
+                  { wMult: 0.35, slope: sign * deg }, 
+                  { wMult: 0.30, isGap: true }, 
+                  { wMult: 0.35, slope: sign * deg }
+              ];
           default: return [{ wMult: 1.0, slope: sign * deg }];
       }
   }
@@ -1623,6 +1616,99 @@
             : 0;
             
         addPlatformToChunk(pObjs[i]);
+    }
+
+    let parallelProb = isTutorial ? 0.15 : 0.40; 
+    if (!IS_TEST_MODE && Math.random() < parallelProb) {
+        let tryDir = Math.random() < 0.5 ? -1 : 1;
+        let extraMult = getPlatformWidthMult(false);
+        let extraW = player.size * extraMult;
+        let gap = 32 + Math.random() * 64; 
+        
+        let extraStartX;
+        let canPlace = false;
+        
+        if (tryDir === -1) {
+            let aLeft = pObjs[0].x;
+            extraStartX = aLeft - gap - extraW;
+            if (extraStartX >= LIMIT_LEFT) {
+                canPlace = true;
+            } else {
+                tryDir = 1;
+            }
+        }
+        if (tryDir === 1 && !canPlace) {
+            let originalLast = pObjs[pObjs.length - 1];
+            let aRight = originalLast.x + originalLast.w;
+            extraStartX = aRight + gap;
+            if (extraStartX + extraW <= LIMIT_RIGHT) {
+                canPlace = true;
+            }
+        }
+        
+        if (canPlace) {
+            let partsB = generateSlopeParts(extraW, false);
+            let cx = extraStartX;
+            let cy = y;
+            let extraPObjs = [];
+            for (let part of partsB) {
+                let partW = extraW * part.wMult;
+                let slopeTan = Math.tan(part.slope * Math.PI / 180);
+                
+                if (cx < LIMIT_RIGHT && cx + partW > LIMIT_LEFT) {
+                    let drawLeft = Math.max(LIMIT_LEFT, cx);
+                    let drawRight = Math.min(LIMIT_RIGHT, cx + partW);
+                    let drawW = drawRight - drawLeft;
+                    let drawY = cy + (drawLeft - cx) * slopeTan;
+                    
+                    if (drawW > 0) {
+                        let pObj = { x: drawLeft, y: drawY, w: drawW, h: 20, isSafety: false, friction: 85, slope: part.slope };
+                        if (drawW >= 32 && !isTutorial && Math.random() < 0.08) {
+                            let altMeters = Math.max(0, Math.floor((startZeroAltY - drawY) / PIXELS_PER_METER));
+                            pObj.chest = { type: getChestType(altMeters), x: drawLeft + drawW / 2, opened: false };
+                        }
+                        extraPObjs.push(pObj);
+                        
+                        aabbMinX = Math.min(aabbMinX, drawLeft);
+                        aabbMaxX = Math.max(aabbMaxX, drawRight);
+                        aabbMinY = Math.min(aabbMinY, drawY, drawY + drawW * slopeTan);
+                        aabbMaxY = Math.max(aabbMaxY, drawY + 20, drawY + drawW * slopeTan + 20);
+                    }
+                }
+                cx += partW;
+                cy += partW * slopeTan;
+            }
+            
+            for (let i = 0; i < extraPObjs.length; i++) {
+                let leftConnected = false;
+                if (i > 0) {
+                    let prevP = extraPObjs[i-1];
+                    if (Math.abs(extraPObjs[i].x - (prevP.x + prevP.w)) < 1.0) leftConnected = true;
+                }
+                
+                let rightConnected = false;
+                if (i < extraPObjs.length - 1) {
+                    let nextP = extraPObjs[i+1];
+                    if (Math.abs(nextP.x - (extraPObjs[i].x + extraPObjs[i].w)) < 1.0) rightConnected = true;
+                }
+
+                extraPObjs[i].isLeftConnected = leftConnected;
+                extraPObjs[i].isRightConnected = rightConnected;
+                
+                let sCurrent = extraPObjs[i].slope || 0;
+                let rad = Math.PI / 180;
+                
+                extraPObjs[i].offsetLeft = leftConnected 
+                    ? -extraPObjs[i].h * Math.tan(((extraPObjs[i-1].slope || 0) + sCurrent) / 2 * rad) 
+                    : 0;
+                extraPObjs[i].offsetRight = rightConnected 
+                    ? -extraPObjs[i].h * Math.tan((sCurrent + (extraPObjs[i+1].slope || 0)) / 2 * rad) 
+                    : 0;
+                
+                pObjs.push(extraPObjs[i]);
+                addPlatformToChunk(extraPObjs[i]);
+            }
+        }
     }
 
     let fP = pObjs[0];
@@ -3016,15 +3102,12 @@
 
     ctx.restore();
 
-    ctx.save();
-    ctx.translate(-cameraX + shakeX, -cameraY + shakeY);
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
         if (p.parapetCanvas) {
             ctx.drawImage(p.parapetCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
         }
     }
-    ctx.restore();
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         let ft = floatingTexts[i];
