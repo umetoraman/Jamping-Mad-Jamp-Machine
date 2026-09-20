@@ -1024,8 +1024,19 @@
           drawPlatformLayer(ctx, dp, endY, 0, 3, surfaceTop);   
 
           let weedSeedBase = Math.abs(Math.floor(p.x + p.y));
+          
+          // 奥の雑草（明るい緑）はベースに書き込む
           drawWeeds(ctx, dp, weedSeedBase + 100, '#4caf50', 8, 12, 0);
-          drawWeeds(ctx, dp, weedSeedBase + 200, surfaceTop, 6, 10, 1);
+          
+          // キャラクターの手前に描画する専用のキャンバスを生成（濃い緑の雑草）
+          let fgCanvas = document.createElement('canvas');
+          fgCanvas.width = cW;
+          fgCanvas.height = cH;
+          let fgCtx = fgCanvas.getContext('2d');
+          fgCtx.translate(-minX, -minY);
+          drawWeeds(fgCtx, dp, weedSeedBase + 200, surfaceTop, 6, 10, 1);
+          p.foregroundCanvas = fgCanvas;
+
       } else {
           ctx.save();
           ctx.beginPath();
@@ -1079,7 +1090,7 @@
           }
           ctx.restore();
           
-          if (p.isSafety) {
+          if (p.isSafety && !p.isGround) {
               ctx.save();
               ctx.rotate(tan ? Math.atan(tan) : 0);
               let parapetH = 24; 
@@ -1125,6 +1136,7 @@
               let chunk = chunks[idx];
               for (let i = 0; i < chunk.length; i++) {
                   chunk[i].cachedCanvas = null; 
+                  chunk[i].foregroundCanvas = null;
               }
           }
       }
@@ -1810,6 +1822,7 @@
             player.isWallJumping = true; 
             
             hitStopEndTime = 0; 
+            player.hitStopCooldownEndTime = 0; // 追加：連続ペナルティ用にクールダウンをリセット
             player.wallHitPlatform = null;
             player.wallHitDir = 0;
             
@@ -1836,6 +1849,7 @@
             player.climbTargetX = climbEndX;
             
             hitStopEndTime = 0; 
+            player.hitStopCooldownEndTime = 0; // 追加：連続ペナルティ用にクールダウンをリセット
             player.vy = 0;
             player.airVx = 0;
             player.vx = 0; 
@@ -2881,7 +2895,8 @@
 
     for (let p of activePlatforms) {
       if (p.invisibleWall) continue; 
-      if (p.isSafety && !p.isGround) continue; // 手前に描画するためスキップ
+      if (p.isSafety && !p.isGround) continue; 
+      if (p.isGround) continue; 
       
       if (!p.cachedCanvas) {
           renderPlatformToCache(p);
@@ -2893,6 +2908,14 @@
           let cY = p.y + (p.chest.x - p.x) * tan;
           drawChest(ctx, p.chest.type, p.chest.x, cY, p.slope || 0);
       }
+    }
+    
+    for (let p of activePlatforms) {
+        if (p.invisibleWall) continue;
+        if (p.isGround) {
+            if (!p.cachedCanvas) renderPlatformToCache(p);
+            ctx.drawImage(p.cachedCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
+        }
     }
 
     ctx.save();
@@ -3081,16 +3104,20 @@
 
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
+        
         if (p.isSafety && !p.isGround) {
-            if (!p.cachedCanvas) {
-                renderPlatformToCache(p);
-            }
+            if (!p.cachedCanvas) renderPlatformToCache(p);
             ctx.drawImage(p.cachedCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
             
             if (p.chest && !p.chest.opened) {
                 let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
                 let cY = p.y + (p.chest.x - p.x) * tan;
                 drawChest(ctx, p.chest.type, p.chest.x, cY, p.slope || 0);
+            }
+        } else if (p.isGround) {
+            if (!p.foregroundCanvas) renderPlatformToCache(p);
+            if (p.foregroundCanvas) {
+                ctx.drawImage(p.foregroundCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
             }
         }
     }
