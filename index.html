@@ -473,6 +473,11 @@
       }, 5000);
   }
 
+  function showSystemMessage(msg) {
+      systemMessage = msg;
+      systemMessageEndTime = Date.now() + 2500;
+  }
+
   function initAudio() {
       if (!audioCtx) audioCtx = new AudioContext();
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -1074,15 +1079,9 @@
           }
           ctx.restore();
           
-          if (p.isSafety && !p.isGround) {
-              let parapetCanvas = document.createElement('canvas');
-              parapetCanvas.width = cW;
-              parapetCanvas.height = cH;
-              let pCtx = parapetCanvas.getContext('2d');
-              pCtx.translate(-minX, -minY);
-
-              pCtx.save();
-              pCtx.rotate(tan ? Math.atan(tan) : 0);
+          if (p.isSafety) {
+              ctx.save();
+              ctx.rotate(tan ? Math.atan(tan) : 0);
               let parapetH = 24; 
               let bW = 20;
               let pSeed = p.x * 5.1 + p.y * 3.3;
@@ -1100,18 +1099,17 @@
                       let bh = Math.min(blockH, currentH - py);
                       let s2 = s + py * 1.7;
                       let colIdx = Math.floor(pRand(s2) * cols.length);
-                      pCtx.fillStyle = cols[colIdx];
+                      ctx.fillStyle = cols[colIdx];
                       
                       let drawY = -py - bh + 2; 
-                      pCtx.fillRect(x + 1, drawY, pDrawW - 2, bh);
+                      ctx.fillRect(x + 1, drawY, pDrawW - 2, bh);
                       
-                      pCtx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
-                      pCtx.lineWidth = 2;
-                      pCtx.strokeRect(x, drawY, pDrawW, bh);
+                      ctx.strokeStyle = `rgba(${Math.floor(bR*0.4)}, ${Math.floor(bG*0.4)}, ${Math.floor(bB*0.4)}, 0.8)`;
+                      ctx.lineWidth = 2;
+                      ctx.strokeRect(x, drawY, pDrawW, bh);
                   }
               }
-              pCtx.restore();
-              p.parapetCanvas = parapetCanvas;
+              ctx.restore();
           }
       }
       
@@ -1127,7 +1125,6 @@
               let chunk = chunks[idx];
               for (let i = 0; i < chunk.length; i++) {
                   chunk[i].cachedCanvas = null; 
-                  chunk[i].parapetCanvas = null; 
               }
           }
       }
@@ -1345,11 +1342,6 @@
     canvas.width = width;
     canvas.height = height;
   });
-
-  function showSystemMessage(msg) {
-      systemMessage = msg;
-      systemMessageEndTime = Date.now() + 2500;
-  }
 
   function setupSigns() {
     initialSigns = [
@@ -1631,7 +1623,7 @@
         }
         
         if (canPlace) {
-            let partsB = generateSlopeParts(extraW, false);
+            let partsB = generateSlopeParts(extraW, isTutorial); 
             let cx = extraStartX;
             let cy = y;
             let extraPObjs = [];
@@ -2656,7 +2648,7 @@
                   player.vy = 0; 
                   
                   if (!wasOnGround) {
-                      if (distFromStart >= player.size) {
+                      if (distFromStart >= player.size || player.isWallJumping) {
                           if (player.isWallJumping || player.lastJumpChargeTime >= 1100) {
                               playSeHitHeavy();
                               player.pendingCeilingConfusion = true; 
@@ -2889,6 +2881,7 @@
 
     for (let p of activePlatforms) {
       if (p.invisibleWall) continue; 
+      if (p.isSafety && !p.isGround) continue; // 手前に描画するためスキップ
       
       if (!p.cachedCanvas) {
           renderPlatformToCache(p);
@@ -3088,8 +3081,17 @@
 
     for (let p of activePlatforms) {
         if (p.invisibleWall) continue;
-        if (p.parapetCanvas) {
-            ctx.drawImage(p.parapetCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
+        if (p.isSafety && !p.isGround) {
+            if (!p.cachedCanvas) {
+                renderPlatformToCache(p);
+            }
+            ctx.drawImage(p.cachedCanvas, p.x + p.cacheMinX, p.y + p.cacheMinY);
+            
+            if (p.chest && !p.chest.opened) {
+                let tan = p.slope ? Math.tan(p.slope * Math.PI / 180) : 0;
+                let cY = p.y + (p.chest.x - p.x) * tan;
+                drawChest(ctx, p.chest.type, p.chest.x, cY, p.slope || 0);
+            }
         }
     }
 
